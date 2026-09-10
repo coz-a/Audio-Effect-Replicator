@@ -63,6 +63,8 @@ uv sync --extra cu130   # NVIDIA GPU (CUDA 13)
 uv sync --extra cpu     # CPU only
 ```
 
+Add `--extra legacy` to install `h5py`, needed only for `aer import-keras`.
+
 ## Training
 
 Copy `configs/default.yml`, point `train_data` / `val_data` at your WAV pairs,
@@ -88,6 +90,24 @@ uv run aer predict -c configs/default.yml -i input.wav -o predicted.wav -m check
 The result is written as 48 kHz / mono / 16-bit PCM with the same number of
 samples. No pre-trained weights are included in this repository.
 
+## Evaluation
+
+Score a checkpoint on a held-out pair, or score an existing prediction:
+
+```sh
+uv run aer evaluate -t val_y.wav -m checkpoint/<timestamp>/model_000392.pt -i val_x.wav
+uv run aer evaluate -t val_y.wav --prediction predicted.wav
+```
+
+Reported values (add `--json scores.json` to save them):
+
+- `mse`: mean squared error against the target
+- `esr`: error-to-signal ratio, sum of squared error over the target's energy
+- `lsd_db`: log-spectral distance, RMS difference of the log-magnitude STFTs
+  (2048 / 512, both signals rounded to 16-bit PCM first) in dB
+- `parameters`, `inference_seconds`, `realtime_factor` (audio seconds per
+  wall-clock second) when a model is given
+
 ## Development
 
 ```sh
@@ -103,6 +123,14 @@ Keras 2.1) are kept at the `2018-original` tag:
 
 ```sh
 git checkout 2018-original
+```
+
+Checkpoints saved by the 2018 code (`*.h5`) can be converted and scored with
+the current code:
+
+```sh
+uv sync --extra cu130 --extra legacy
+uv run aer import-keras model_000031.h5 -o model_000031.pt
 ```
 
 > The original dependencies are retained for historical reference only.
