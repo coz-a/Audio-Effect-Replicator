@@ -1,7 +1,9 @@
-"""Command line interface: `aer train` and `aer predict`."""
+"""Command line interface: `aer train`, `aer predict`, `aer evaluate`, `aer import-keras`."""
 
 import argparse
+import json
 import logging
+import math
 import sys
 import wave
 from pathlib import Path
@@ -10,7 +12,10 @@ from audio_effect_replicator import __version__
 from audio_effect_replicator.audio import load_wave, save_wave
 from audio_effect_replicator.config import load_config
 from audio_effect_replicator.device import resolve_device
-from audio_effect_replicator.model import load_checkpoint
+from audio_effect_replicator.evaluate import evaluate_prediction, time_inference
+from audio_effect_replicator.legacy import load_keras_checkpoint
+from audio_effect_replicator.metrics import parameter_count
+from audio_effect_replicator.model import load_checkpoint, save_checkpoint
 from audio_effect_replicator.predict import predict
 from audio_effect_replicator.train import train
 
@@ -50,6 +55,28 @@ def _build_parser() -> argparse.ArgumentParser:
     p_predict.add_argument("-m", "--model", required=True, type=Path, help="checkpoint (*.pt)")
     p_predict.add_argument("--device", default="auto", help="auto, cpu, cuda or mps")
     p_predict.set_defaults(func=_predict)
+
+    p_eval = sub.add_parser(
+        "evaluate", help="score a model or an existing prediction against a target WAV"
+    )
+    p_eval.add_argument("-t", "--target", required=True, type=Path, help="reference output WAV")
+    source = p_eval.add_mutually_exclusive_group(required=True)
+    source.add_argument("-m", "--model", type=Path, help="checkpoint (*.pt) to run on --input")
+    source.add_argument("--prediction", type=Path, help="already predicted WAV to score")
+    p_eval.add_argument("-i", "--input", type=Path, help="input WAV for --model")
+    p_eval.add_argument(
+        "-c", "--config", type=Path, help="config YAML (batch_size only, default 16)"
+    )
+    p_eval.add_argument("--device", default="auto", help="auto, cpu, cuda or mps")
+    p_eval.add_argument("--json", type=Path, help="also write the scores to this JSON file")
+    p_eval.set_defaults(func=_evaluate)
+
+    p_import = sub.add_parser("import-keras", help="convert a 2018 Keras checkpoint (*.h5) to *.pt")
+    p_import.add_argument("h5", type=Path)
+    p_import.add_argument("-o", "--output", required=True, type=Path)
+    p_import.add_argument("--input-timesteps", type=int, default=5280)
+    p_import.add_argument("--output-timesteps", type=int, default=480)
+    p_import.set_defaults(func=_import_keras)
     return parser
 
 
@@ -71,4 +98,42 @@ def _predict(args: argparse.Namespace) -> int:
     )
     save_wave(output, args.output)
     print(f"wrote {args.output} ({len(output)} samples)")
+    return 0
+
+
+def _evaluate(args: argparse.Namespace) -> int:
+    target = load_wave(args.target)
+    if args.model is not None:
+        if args.input is None:
+            raise ValueError("-i/--input is required together with -m/--model")
+        device = resolve_device(args.device)
+        batch_size = load_config(args.config).batch_size if args.config else 16
+        model, meta = load_checkpoint(args.model, device)
+        samples = load_wave(args.input)
+        timesteps = (meta["input_timesteps"], meta["output_timesteps"])
+        pred = predict(model, samples, *timesteps, batch_size, device)
+        result: dict[str, object] = {
+            "checkpoint": str(args.model),
+            "epoch": meta["epoch"],
+            "parameters": parameter_count(model),
+            "device": device.type,
+            **evaluate_prediction(pred, target),
+            **time_inference(model, samples, *timesteps, batch_size, device),
+        }
+    else:
+        prediction = load_wave(args.prediction)
+        result = {"prediction": str(args.prediction), **evaluate_prediction(prediction, target)}
+    for key, value in result.items():
+        print(f"{key:18s} {value:.6g}" if isinstance(value, float) else f"{key:18s} {value}")
+    if args.json is not None:
+        args.json.write_text(json.dumps(result, indent=2) + "\n")
+    return 0
+
+
+def _import_keras(args: argparse.Namespace) -> int:
+    model, epoch = load_keras_checkpoint(args.h5)
+    save_checkpoint(
+        args.output, model, args.input_timesteps, args.output_timesteps, epoch, math.nan
+    )
+    print(f"wrote {args.output} (epoch {epoch}, {parameter_count(model)} parameters)")
     return 0
