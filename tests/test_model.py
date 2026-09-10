@@ -2,7 +2,6 @@ from pathlib import Path
 
 import torch
 
-from audio_effect_replicator.config import Config
 from audio_effect_replicator.model import FxReplicator, load_checkpoint, save_checkpoint
 
 
@@ -19,17 +18,17 @@ def test_layer_sizes_match_2018() -> None:
     assert (model.lstm_out.input_size, model.lstm_out.hidden_size) == (64, 1)
 
 
-def test_checkpoint_roundtrip(tmp_path: Path, small_config: Config) -> None:
+def test_checkpoint_roundtrip(tmp_path: Path) -> None:
     model = FxReplicator()
     x = torch.randn(1, 16, 1)
     path = tmp_path / "model_000003.pt"
-    save_checkpoint(path, model, small_config, epoch=3, val_loss=0.5)
+    save_checkpoint(path, model, 64, 16, epoch=3, val_loss=0.5)
     loaded, meta = load_checkpoint(path, torch.device("cpu"))
     torch.testing.assert_close(loaded(x), model(x))
     assert meta["epoch"] == 3
     assert meta["val_loss"] == 0.5
-    assert meta["input_timesteps"] == small_config.input_timesteps
-    assert meta["output_timesteps"] == small_config.output_timesteps
+    assert meta["input_timesteps"] == 64
+    assert meta["output_timesteps"] == 16
     assert not loaded.training
 
 

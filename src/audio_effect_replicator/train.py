@@ -61,7 +61,14 @@ def train(
         if val_loss < best:
             best = val_loss
             epochs_without_improvement = 0
-            save_checkpoint(ckpt_dir / f"model_{epoch:06d}.pt", model, config, epoch, val_loss)
+            save_checkpoint(
+                ckpt_dir / f"model_{epoch:06d}.pt",
+                model,
+                config.input_timesteps,
+                config.output_timesteps,
+                epoch,
+                val_loss,
+            )
         else:
             epochs_without_improvement += 1
         log.info(
