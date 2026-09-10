@@ -55,3 +55,20 @@ def test_empty_data_list_is_config_error(tmp_path: Path) -> None:
     )
     with pytest.raises(ConfigError, match="train_data"):
         load_config(path)
+
+
+def test_non_mapping_top_level_is_config_error(tmp_path: Path) -> None:
+    path = tmp_path / "c.yml"
+    path.write_text("- just\n- a list\n")
+    with pytest.raises(ConfigError, match="mapping"):
+        load_config(path)
+
+
+def test_non_pair_entry_is_config_error(tmp_path: Path) -> None:
+    path = tmp_path / "c.yml"
+    path.write_text(
+        "input_timesteps: 10\noutput_timesteps: 5\nbatch_size: 1\nmax_epochs: 1\n"
+        "patience: 1\ntrain_data:\n  - [only_one.wav]\nval_data:\n  - [a.wav, b.wav]\n"
+    )
+    with pytest.raises(ConfigError, match="pairs"):
+        load_config(path)
