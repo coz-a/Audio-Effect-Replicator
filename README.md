@@ -20,86 +20,95 @@ article:
 
 ## Architecture
 
-The model is three stacked LSTM layers (Keras `CuDNNLSTM`) that map a dry
-input waveform to the effected output waveform, producing one output sample
-per input sample.
+The model is three stacked LSTM layers that map a dry input waveform to the
+effected output waveform, producing one output sample per input sample. It is
+implemented with PyTorch `nn.LSTM` (cuDNN on CUDA); the 2018 version used Keras
+`CuDNNLSTM` with the same layer sizes.
 
 ```
 Input waveform (48 kHz, mono)
         |
-LSTM (64 units, return_sequences)
+LSTM (64 units)
         |
-LSTM (64 units, return_sequences)
+LSTM (64 units)
         |
-LSTM (1 unit, return_sequences)
+LSTM (1 unit)
         |
 Output waveform (48 kHz, mono)
 ```
 
 - **Data:** pairs of 48 kHz / mono / 16-bit PCM WAV files (dry input and
-  effected output), listed in `config.yml`.
+  effected output), listed in the config file.
 - **Training:** random windows of `input_timesteps` (5280) samples are drawn
   from the training pairs. The loss is the mean squared error over the last
   `output_timesteps` (480) samples of each window only; the preceding 4800
-  samples act as a warm-up for the LSTM state.
+  samples act as a warm-up for the LSTM state. Adam, learning rate 1e-3.
 - **Inference:** the input is zero-padded with 4800 samples in front and
   processed with a sliding window (window 5280, hop 480). For each window the
-  last 480 output samples are kept and concatenated to form the output
-  waveform.
+  last 480 output samples are kept and concatenated; the output has exactly
+  the length of the input.
+
+Weights are initialized as in Keras 2.1 (glorot-uniform input kernels,
+orthogonal recurrent kernels, forget-gate bias 1); with PyTorch's default
+initialization this stack barely trains. Runs are still not bit-identical to
+the 2018 Keras runs.
 
 ## Installation
 
-The original package dependencies are pinned in `requirements.txt`
-(`tensorflow-gpu==1.5.0`, `Keras==2.1.3` and others). The model uses Keras
-`CuDNNLSTM`, so an NVIDIA GPU with cuDNN is required.
+Requires Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
+PyTorch is installed through one of two extras:
 
 ```sh
-pip install -r requirements.txt
+uv sync --extra cu130   # NVIDIA GPU (CUDA 13)
+uv sync --extra cpu     # CPU only
+```
+
+## Training
+
+Copy `configs/default.yml`, point `train_data` / `val_data` at your WAV pairs,
+then:
+
+```sh
+uv run aer train -c configs/default.yml
+```
+
+Checkpoints are written to `checkpoint/<timestamp>/model_<epoch>.pt` (epoch
+zero-padded to six digits, best validation loss only) and TensorBoard logs to
+`tensorboard/<timestamp>/`. Training stops early after `patience` epochs
+without improvement in validation loss. `--device cpu|cuda|mps` overrides the
+automatic choice; `--seed N` makes the run reproducible.
+
+## Inference
+
+```sh
+uv run aer predict -c configs/default.yml -i input.wav -o predicted.wav -m checkpoint/<timestamp>/model_000031.pt
+```
+
+`input.wav` must be 48 kHz / mono / 16-bit PCM (other formats are rejected).
+The result is written as 48 kHz / mono / 16-bit PCM with the same number of
+samples. No pre-trained weights are included in this repository.
+
+## Development
+
+```sh
+uv sync --extra cu130
+uv run ruff check && uv run ruff format --check && uv run pyright && uv run pytest
+```
+
+## Legacy Version
+
+The original February 2018 scripts (`train.py`, `predict.py`,
+`fx_replicator.py`) and their `requirements.txt` (TensorFlow GPU 1.5,
+Keras 2.1) are kept at the `2018-original` tag:
+
+```sh
+git checkout 2018-original
 ```
 
 > The original dependencies are retained for historical reference only.
 > They should not be used in production or security-sensitive environments.
 
 Legacy 2018 environments are not supported.
-
-## Training
-
-Edit `config.yml` to point at your training / validation WAV pairs, then:
-
-```sh
-python train.py -c config.yml
-```
-
-Checkpoints are written to `checkpoint/<timestamp>/model_<epoch>.h5` with the
-epoch zero-padded to six digits (e.g. `model_000031.h5`), keeping only the
-best validation loss. TensorBoard logs go to `tensorboard/<timestamp>/`.
-Training stops early after `patience` epochs without improvement in
-validation loss.
-
-## Inference
-
-```sh
-python predict.py -c config.yml -i input.wav -o predicted.wav -m checkpoint/20180208_235128/model_000031.h5
-```
-
-No pre-trained weights are included in this repository; replace the
-checkpoint path with one produced by training.
-
-`input.wav` is expected to be 48 kHz / mono / 16-bit PCM; the format is not
-validated. The result is always written as 48 kHz / mono / 16-bit PCM.
-
-> Note: the original `predict.py` pads the input incorrectly for some input
-> lengths. Depending on the length, the output may be a few samples shorter
-> than the input, or the script may fail on an empty window array.
-
-## Legacy Version
-
-To inspect the original February 2018 implementation exactly as it was
-released:
-
-```sh
-git checkout 2018-original
-```
 
 ## License
 
