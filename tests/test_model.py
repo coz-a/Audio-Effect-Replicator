@@ -31,3 +31,26 @@ def test_checkpoint_roundtrip(tmp_path: Path, small_config: Config) -> None:
     assert meta["input_timesteps"] == small_config.input_timesteps
     assert meta["output_timesteps"] == small_config.output_timesteps
     assert not loaded.training
+
+
+def test_init_matches_keras_2_1() -> None:
+    """Keras 2.1 LSTM defaults: orthogonal recurrent kernels, forget-gate bias 1, other biases 0."""
+    model = FxReplicator()
+    for lstm in (model.lstm1, model.lstm2, model.lstm_out):
+        h = lstm.hidden_size
+        _, weight_hh, bias_ih, bias_hh = lstm.all_weights[0]
+        for gate in range(4):
+            block = weight_hh[gate * h : (gate + 1) * h]
+            torch.testing.assert_close(block @ block.T, torch.eye(h), atol=1e-5, rtol=0)
+        expected_bias = torch.zeros(4 * h)
+        expected_bias[h : 2 * h] = 1.0  # gate order in torch: input, forget, cell, output
+        torch.testing.assert_close(bias_ih, expected_bias)
+        torch.testing.assert_close(bias_hh, torch.zeros(4 * h))
+
+
+def test_init_input_weights_are_glorot_bounded() -> None:
+    model = FxReplicator()
+    w = model.lstm1.all_weights[0][0]  # weight_ih, shape (4*64, 1): fan_in 1, fan_out 256
+    bound = (6.0 / (1 + 4 * 64)) ** 0.5
+    assert w.abs().max() <= bound
+    assert w.abs().max() > 0.5 * bound  # not the torch default (+-1/sqrt(64) = 0.125)
