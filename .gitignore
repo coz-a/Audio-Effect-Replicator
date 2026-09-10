@@ -70,9 +70,6 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# pyenv
-.python-version
-
 # celery beat schedule file
 celerybeat-schedule
 
@@ -99,3 +96,9 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# training artifacts
+checkpoint/
+tensorboard/
+data/
+*.wav

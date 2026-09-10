@@ -1,0 +1,67 @@
+[project]
+name = "audio-effect-replicator"
+version = "1.0.0"
+description = "LSTM-based black-box modeling of audio effects."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "coz-a" }]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2",
+    "pyyaml>=6",
+    "tensorboard>=2.21",
+]
+
+[project.optional-dependencies]
+cpu = ["torch>=2.14"]
+cu130 = ["torch>=2.14"]
+
+[project.scripts]
+aer = "audio_effect_replicator.cli:main"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9",
+    "ruff>=0.16",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.12,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+conflicts = [[{ extra = "cpu" }, { extra = "cu130" }]]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu130", extra = "cu130" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
