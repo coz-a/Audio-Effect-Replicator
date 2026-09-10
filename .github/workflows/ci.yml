@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           enable-cache: true
-      - run: uv sync --extra cpu
+      - run: uv sync --extra cpu --extra legacy
       - run: uv run ruff check
       - run: uv run ruff format --check
       - run: uv run pyright
