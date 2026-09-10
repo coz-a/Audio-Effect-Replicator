@@ -48,8 +48,10 @@ Output waveform (48 kHz, mono)
   last 480 output samples are kept and concatenated; the output has exactly
   the length of the input.
 
-Weight initialization follows PyTorch defaults, so trained weights are not
-numerically identical to a Keras run with the same data.
+Weights are initialized as in Keras 2.1 (glorot-uniform input kernels,
+orthogonal recurrent kernels, forget-gate bias 1); with PyTorch's default
+initialization this stack barely trains. Runs are still not bit-identical to
+the 2018 Keras runs.
 
 ## Installation
 
