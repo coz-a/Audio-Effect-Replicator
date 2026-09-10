@@ -15,6 +15,7 @@ dependencies = [
 [project.optional-dependencies]
 cpu = ["torch>=2.14"]
 cu130 = ["torch>=2.14"]
+legacy = ["h5py>=3"]
 
 [project.scripts]
 aer = "audio_effect_replicator.cli:main"

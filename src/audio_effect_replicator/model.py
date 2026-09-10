@@ -6,8 +6,6 @@ from typing import Any
 import torch
 from torch import nn
 
-from audio_effect_replicator.config import Config
-
 CHECKPOINT_VERSION = 1
 
 
@@ -44,14 +42,19 @@ def _init_like_keras(lstm: nn.LSTM) -> None:
 
 
 def save_checkpoint(
-    path: str | Path, model: FxReplicator, config: Config, epoch: int, val_loss: float
+    path: str | Path,
+    model: FxReplicator,
+    input_timesteps: int,
+    output_timesteps: int,
+    epoch: int,
+    val_loss: float,
 ) -> None:
     torch.save(
         {
             "version": CHECKPOINT_VERSION,
             "hidden": model.hidden,
-            "input_timesteps": config.input_timesteps,
-            "output_timesteps": config.output_timesteps,
+            "input_timesteps": input_timesteps,
+            "output_timesteps": output_timesteps,
             "epoch": epoch,
             "val_loss": val_loss,
             "model_state_dict": model.state_dict(),
