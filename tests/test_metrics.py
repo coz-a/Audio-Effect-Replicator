@@ -10,7 +10,7 @@ from audio_effect_replicator.model import FxReplicator
 def signal(n: int = 8192) -> np.ndarray:
     t = np.arange(n) / 48000
     rng = np.random.default_rng(0)
-    return (0.5 * np.sin(2 * np.pi * 220 * t) + 0.05 * rng.standard_normal(n)).astype(np.float32)
+    return (0.25 * np.sin(2 * np.pi * 220 * t) + 0.02 * rng.standard_normal(n)).astype(np.float32)
 
 
 def test_identical_signals_score_zero() -> None:
@@ -48,3 +48,9 @@ def test_esr_rejects_silent_target() -> None:
 def test_parameter_count_of_2018_model() -> None:
     # 4 gates x (in*h + h*h + 2h) per layer: (1,64) 17152 + (64,64) 33280 + (64,1) 268
     assert parameter_count(FxReplicator()) == 50_700
+
+
+def test_lsd_is_insensitive_to_16_bit_quantization() -> None:
+    x = signal()
+    quantized = (np.round(x * 32767) / 32767).astype(np.float32)
+    assert log_spectral_distance(x, quantized) == 0.0
