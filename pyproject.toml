@@ -23,6 +23,7 @@ aer = "audio_effect_replicator.cli:main"
 dev = [
     "pyright>=1.1.414",
     "pytest>=9",
+    "pytest-cov>=7",
     "ruff>=0.16",
 ]
 
@@ -65,3 +66,8 @@ venv = ".venv"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--cov=audio_effect_replicator --cov-report=term-missing"
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
