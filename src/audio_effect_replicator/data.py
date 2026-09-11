@@ -5,15 +5,15 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from audio_effect_replicator.audio import load_wave
+from audio_effect_replicator.audio import SAMPLE_RATE, load_wave
 
 Pair = tuple[np.ndarray, np.ndarray]
 
 
-def load_pairs(paths: list[tuple[Path, Path]]) -> list[Pair]:
+def load_pairs(paths: list[tuple[Path, Path]], sample_rate: int = SAMPLE_RATE) -> list[Pair]:
     pairs: list[Pair] = []
     for x_path, y_path in paths:
-        x, y = load_wave(x_path), load_wave(y_path)
+        x, y = load_wave(x_path, sample_rate), load_wave(y_path, sample_rate)
         if len(x) != len(y):
             raise ValueError(f"{x_path} and {y_path} differ in length ({len(x)} vs {len(y)})")
         pairs.append((x, y))

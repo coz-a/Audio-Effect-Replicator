@@ -30,6 +30,7 @@ def test_checkpoint_roundtrip(tmp_path: Path) -> None:
     assert meta["input_timesteps"] == 64
     assert meta["output_timesteps"] == 16
     assert not loaded.training
+    assert meta["sample_rate"] == 48000
 
 
 def test_init_matches_keras_2_1() -> None:
@@ -53,3 +54,28 @@ def test_init_input_weights_are_glorot_bounded() -> None:
     bound = (6.0 / (1 + 4 * 64)) ** 0.5
     assert w.abs().max() <= bound
     assert w.abs().max() > 0.5 * bound  # not the torch default (+-1/sqrt(64) = 0.125)
+
+
+def test_checkpoint_stores_sample_rate(tmp_path: Path) -> None:
+    path = tmp_path / "m.pt"
+    model = FxReplicator(hidden=4)
+    save_checkpoint(path, model, 64, 16, epoch=1, val_loss=0.1, sample_rate=44100)
+    assert load_checkpoint(path, torch.device("cpu"))[1]["sample_rate"] == 44100
+
+
+def test_old_checkpoint_without_sample_rate_defaults_to_48000(tmp_path: Path) -> None:
+    model = FxReplicator(hidden=4)
+    path = tmp_path / "old.pt"
+    torch.save(
+        {
+            "version": 1,
+            "hidden": 4,
+            "input_timesteps": 64,
+            "output_timesteps": 16,
+            "epoch": 1,
+            "val_loss": 0.1,
+            "model_state_dict": model.state_dict(),
+        },
+        path,
+    )
+    assert load_checkpoint(path, torch.device("cpu"))[1]["sample_rate"] == 48000

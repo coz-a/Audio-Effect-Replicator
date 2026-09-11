@@ -37,8 +37,8 @@ LSTM (1 unit)
 Output waveform (48 kHz, mono)
 ```
 
-- **Data:** pairs of 48 kHz / mono / 16-bit PCM WAV files (dry input and
-  effected output), listed in the config file.
+- **Data:** pairs of mono WAV files (dry input and effected output) at the
+  configured sample rate, 48 kHz in the 2018 setup, listed in the config file.
 - **Training:** random windows of `input_timesteps` (5280) samples are drawn
   from the training pairs. The loss is the mean squared error over the last
   `output_timesteps` (480) samples of each window only; the preceding 4800
@@ -65,6 +65,35 @@ uv sync --extra cpu     # CPU only
 
 Add `--extra legacy` to install `h5py`, needed only for `aer import-keras`.
 
+## Datasets
+
+Any pair of mono WAV files (16/24/32-bit PCM or 32-bit float) can be used;
+set `sample_rate` in the config if it is not 48 kHz. Public benchmark data can
+be fetched with a checksum-verified download:
+
+```sh
+uv run aer fetch-dataset --list
+uv run aer fetch-dataset wright2019      # -> data/wright2019/
+```
+
+If [axel](https://github.com/axel-download-accelerator/axel) is on the PATH it
+is used automatically, which is far faster on hosts that throttle a single
+connection, and it resumes an interrupted download.
+
+`wright2019` is the Blackstar HT-1 / Big Muff Pi data from Wright, Damskägg
+and Välimäki, "Real-Time Black-Box Modelling with Recurrent Neural Networks"
+(DAFx 2019), 44.1 kHz, with the train / val / test split of the original
+repository. It is licensed CC BY-NC 4.0: fine for research and comparisons,
+not for commercial models. `configs/wright2019-ht1.yml` and
+`configs/wright2019-muff.yml` train on it with the 2018 settings.
+
+`tonetwist-afx-analog`, `tonetwist-afx-digital`, `tonetwist-afx-analog-parametric`
+and `tonetwist-afx-digital-parametric` are the subsets of the ToneTwisT AFx
+dataset (Comunità, Steinmetz and Reiss, 2025): about 50 hardware and plugin
+effects as dry/wet pairs at 48 kHz / 32-bit float, 72 GB in total, all
+CC BY-NC 4.0. Each Zenodo archive is extracted into `data/tonetwist-afx/<name>/`;
+split archives need 7-Zip (`7z`) on the PATH.
+
 ## Training
 
 Copy `configs/default.yml`, point `train_data` / `val_data` at your WAV pairs,
@@ -83,19 +112,20 @@ automatic choice; `--seed N` makes the run reproducible.
 ## Inference
 
 ```sh
-uv run aer predict -c configs/default.yml -i input.wav -o predicted.wav -m checkpoint/<timestamp>/model_000031.pt
+uv run aer predict -c configs/default.yml -i input.wav -o predicted.wav -m checkpoint/<timestamp>/model_<epoch>.pt
 ```
 
-`input.wav` must be 48 kHz / mono / 16-bit PCM (other formats are rejected).
-The result is written as 48 kHz / mono / 16-bit PCM with the same number of
-samples. No pre-trained weights are included in this repository.
+`input.wav` must be mono at the checkpoint's sample rate (other files are
+rejected); 16/24/32-bit PCM and 32-bit float are accepted. The result is
+written as 16-bit PCM at the same rate with the same number of samples. No
+pre-trained weights are included in this repository.
 
 ## Evaluation
 
 Score a checkpoint on a held-out pair, or score an existing prediction:
 
 ```sh
-uv run aer evaluate -t val_y.wav -m checkpoint/<timestamp>/model_000392.pt -i val_x.wav
+uv run aer evaluate -t val_y.wav -m checkpoint/<timestamp>/model_<epoch>.pt -i val_x.wav
 uv run aer evaluate -t val_y.wav --prediction predicted.wav
 ```
 
@@ -108,10 +138,27 @@ Reported values (add `--json scores.json` to save them):
 - `parameters`, `inference_seconds`, `realtime_factor` (audio seconds per
   wall-clock second) when a model is given
 
+## Benchmarks
+
+Test-set scores of the 2018 method (this code, `configs/wright2019-*.yml`:
+the 2018 settings at 44.1 kHz) on the `wright2019` data. One run each with
+seed 0; no pre-trained weights are shipped.
+
+| Device | Model | Parameters | ESR | MSE | LSD (dB) |
+| --- | --- | --- | --- | --- | --- |
+| Blackstar HT-1 | LSTM 64-64-1, MSE loss, sliding window (2018 method) | 50,700 | 2.97 % | 0.00297 | 13.97 |
+| Big Muff Pi | LSTM 64-64-1, MSE loss, sliding window (2018 method) | 50,700 | 11.1 % | 0.00028 | 8.65 |
+
+For reference, Wright et al. (2019) report test ESR of 1.8 % (HT-1) and
+4.1 % (Big Muff) for their single-layer LSTM-64 with a linear output trained
+with an ESR + pre-emphasis loss, and 0.79 % / 9.2 % for their best WaveNet
+models. Their models were trained on five control settings with a
+conditioning input, so the comparison is indicative only.
+
 ## Development
 
 ```sh
-uv sync --extra cu130
+uv sync --extra cpu --extra legacy   # or --extra cu130 on an NVIDIA GPU
 uv run ruff check && uv run ruff format --check && uv run pyright && uv run pytest
 ```
 
@@ -126,10 +173,9 @@ git checkout 2018-original
 ```
 
 Checkpoints saved by the 2018 code (`*.h5`) can be converted and scored with
-the current code:
+the current code (needs the `legacy` extra):
 
 ```sh
-uv sync --extra cu130 --extra legacy
 uv run aer import-keras model_000031.h5 -o model_000031.pt
 ```
 

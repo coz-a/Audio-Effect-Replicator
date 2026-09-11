@@ -3,6 +3,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import soundfile
+import yaml
 
 from audio_effect_replicator import __version__
 from audio_effect_replicator.audio import load_wave, save_wave
@@ -67,7 +69,7 @@ def test_evaluate_prediction_path(
     printed = capsys.readouterr().out
     assert "esr" in printed and "lsd_db" in printed
     scores = json.loads(out.read_text())
-    assert set(scores) == {"prediction", "mse", "esr", "lsd_db"}
+    assert set(scores) == {"prediction", "sample_rate", "mse", "esr", "lsd_db"}
     assert scores["esr"] > 0
 
 
@@ -114,3 +116,58 @@ def test_import_keras_then_evaluate(tmp_path: Path, wav_pair: tuple[Path, Path])
     x_path, y_path = wav_pair
     args = ["evaluate", "-t", str(y_path), "-m", str(pt), "-i", str(x_path), "--device", "cpu"]
     assert main(args) == 0
+
+
+def test_evaluate_prediction_at_44100(tmp_path: Path) -> None:
+    x = np.random.default_rng(0).standard_normal(8192).astype(np.float32) * 0.1
+    save_wave(x, tmp_path / "p.wav", sample_rate=44100)
+    save_wave(x, tmp_path / "t.wav", sample_rate=44100)
+    args = ["evaluate", "-t", str(tmp_path / "t.wav"), "--prediction", str(tmp_path / "p.wav")]
+    assert main(args) == 1  # default 48000 does not match
+    assert main([*args, "--sample-rate", "44100"]) == 0
+
+
+def test_predict_writes_the_checkpoint_sample_rate(tmp_path: Path) -> None:
+    rng = np.random.default_rng(0)
+    x = (0.3 * rng.standard_normal(44100)).astype(np.float32)
+    save_wave(x, tmp_path / "x.wav", sample_rate=44100)
+    save_wave(np.tanh(3 * x), tmp_path / "y.wav", sample_rate=44100)
+    raw = {
+        "sample_rate": 44100,
+        "input_timesteps": 64,
+        "output_timesteps": 16,
+        "batch_size": 4,
+        "max_epochs": 1,
+        "patience": 1,
+        "steps_per_epoch": 1,
+        "validation_steps": 1,
+        "train_data": [[str(tmp_path / "x.wav"), str(tmp_path / "y.wav")]],
+        "val_data": [[str(tmp_path / "x.wav"), str(tmp_path / "y.wav")]],
+    }
+    config = tmp_path / "c.yml"
+    config.write_text(yaml.safe_dump(raw))
+    model = train_on_cpu(config, tmp_path / "run")
+    out = tmp_path / "out.wav"
+    args = ["predict", "-c", str(config), "-i", str(tmp_path / "x.wav"), "-o", str(out)]
+    assert main([*args, "-m", str(model), "--device", "cpu"]) == 0
+    assert soundfile.info(str(out)).samplerate == 44100
+
+
+def test_fetch_dataset_cli(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from tests.test_datasets import local_manifest
+
+    manifest = local_manifest(tmp_path)
+    args = ["fetch-dataset", "--manifest", str(manifest), "--dest", str(tmp_path / "data")]
+    assert main(args) == 0
+    assert (tmp_path / "data" / "toy" / "a.wav").exists()
+    assert "license: L" in capsys.readouterr().out
+
+
+def test_fetch_dataset_list(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["fetch-dataset", "--list"]) == 0
+    assert "wright2019" in capsys.readouterr().out
+
+
+def test_fetch_dataset_requires_a_name(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["fetch-dataset"]) == 1
+    assert "error:" in capsys.readouterr().err

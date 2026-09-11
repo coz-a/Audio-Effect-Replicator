@@ -6,6 +6,8 @@ from typing import Any
 import torch
 from torch import nn
 
+from audio_effect_replicator.audio import SAMPLE_RATE
+
 CHECKPOINT_VERSION = 1
 
 
@@ -48,6 +50,7 @@ def save_checkpoint(
     output_timesteps: int,
     epoch: int,
     val_loss: float,
+    sample_rate: int = SAMPLE_RATE,
 ) -> None:
     torch.save(
         {
@@ -55,6 +58,7 @@ def save_checkpoint(
             "hidden": model.hidden,
             "input_timesteps": input_timesteps,
             "output_timesteps": output_timesteps,
+            "sample_rate": sample_rate,
             "epoch": epoch,
             "val_loss": val_loss,
             "model_state_dict": model.state_dict(),
@@ -65,6 +69,7 @@ def save_checkpoint(
 
 def load_checkpoint(path: str | Path, device: torch.device) -> tuple[FxReplicator, dict[str, Any]]:
     meta: dict[str, Any] = torch.load(path, map_location=device, weights_only=True)
+    meta.setdefault("sample_rate", SAMPLE_RATE)  # checkpoints written before sample_rate existed
     model = FxReplicator(hidden=meta["hidden"]).to(device)
     model.load_state_dict(meta["model_state_dict"])
     model.eval()

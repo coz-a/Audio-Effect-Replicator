@@ -45,7 +45,9 @@ def log_spectral_distance(
 
 
 def _quantize(x: np.ndarray) -> np.ndarray:
-    return (np.round(np.clip(x, -1.0, 1.0) * 32767) / 32767).astype(np.float32)
+    """Round to the 16-bit PCM grid the way soundfile does (scale 32768, clip to int16)."""
+    pcm = np.clip(np.round(x * 32768), -32768, 32767)
+    return (pcm / 32768).astype(np.float32)
 
 
 def parameter_count(model: nn.Module) -> int:

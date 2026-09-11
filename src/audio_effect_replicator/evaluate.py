@@ -26,6 +26,7 @@ def time_inference(
     output_timesteps: int,
     batch_size: int,
     device: torch.device,
+    sample_rate: int = SAMPLE_RATE,
 ) -> dict[str, float]:
     """Wall-clock time of one `predict` call after one warm-up call."""
     predict(model, samples, input_timesteps, output_timesteps, batch_size, device)
@@ -34,7 +35,7 @@ def time_inference(
     predict(model, samples, input_timesteps, output_timesteps, batch_size, device)
     _synchronize(device)
     seconds = time.perf_counter() - start
-    return {"inference_seconds": seconds, "realtime_factor": len(samples) / SAMPLE_RATE / seconds}
+    return {"inference_seconds": seconds, "realtime_factor": len(samples) / sample_rate / seconds}
 
 
 def _synchronize(device: torch.device) -> None:

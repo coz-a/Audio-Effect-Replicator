@@ -72,3 +72,17 @@ def test_non_pair_entry_is_config_error(tmp_path: Path) -> None:
     )
     with pytest.raises(ConfigError, match="pairs"):
         load_config(path)
+
+
+def test_sample_rate_defaults_to_48000(config_file: Path) -> None:
+    assert load_config(config_file).sample_rate == 48000
+
+
+def test_sample_rate_is_read(tmp_path: Path) -> None:
+    path = tmp_path / "c.yml"
+    path.write_text(
+        "sample_rate: 44100\ninput_timesteps: 10\noutput_timesteps: 5\nbatch_size: 1\n"
+        "max_epochs: 1\npatience: 1\n"
+        "train_data:\n  - [a.wav, b.wav]\nval_data:\n  - [a.wav, b.wav]\n"
+    )
+    assert load_config(path).sample_rate == 44100

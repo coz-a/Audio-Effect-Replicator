@@ -1,16 +1,21 @@
-"""Command line interface: `aer train`, `aer predict`, `aer evaluate`, `aer import-keras`."""
+"""Command line interface: train, predict, evaluate, import-keras and fetch-dataset."""
 
 import argparse
 import json
 import logging
 import math
 import sys
-import wave
 from pathlib import Path
 
 from audio_effect_replicator import __version__
-from audio_effect_replicator.audio import load_wave, save_wave
+from audio_effect_replicator.audio import SAMPLE_RATE, load_wave, save_wave
 from audio_effect_replicator.config import load_config
+from audio_effect_replicator.datasets import (
+    fetch_dataset,
+    list_datasets,
+    load_manifest,
+    packaged_manifest,
+)
 from audio_effect_replicator.device import resolve_device
 from audio_effect_replicator.evaluate import evaluate_prediction, time_inference
 from audio_effect_replicator.legacy import load_keras_checkpoint
@@ -25,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     try:
         return args.func(args)
-    except (OSError, ValueError, RuntimeError, wave.Error) as exc:
+    except (OSError, ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
@@ -68,6 +73,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "-c", "--config", type=Path, help="config YAML (batch_size only, default 16)"
     )
     p_eval.add_argument("--device", default="auto", help="auto, cpu, cuda or mps")
+    p_eval.add_argument(
+        "--sample-rate",
+        type=int,
+        default=SAMPLE_RATE,
+        help="expected rate for --prediction (a model uses its checkpoint's rate)",
+    )
     p_eval.add_argument("--json", type=Path, help="also write the scores to this JSON file")
     p_eval.set_defaults(func=_evaluate)
 
@@ -76,7 +87,17 @@ def _build_parser() -> argparse.ArgumentParser:
     p_import.add_argument("-o", "--output", required=True, type=Path)
     p_import.add_argument("--input-timesteps", type=int, default=5280)
     p_import.add_argument("--output-timesteps", type=int, default=480)
+    p_import.add_argument("--sample-rate", type=int, default=SAMPLE_RATE)
     p_import.set_defaults(func=_import_keras)
+
+    p_fetch = sub.add_parser("fetch-dataset", help="download a benchmark dataset into --dest")
+    p_fetch.add_argument("name", nargs="?", help="dataset name (see --list)")
+    p_fetch.add_argument("--dest", default=Path("data"), type=Path)
+    p_fetch.add_argument(
+        "--manifest", type=Path, help="use this manifest file instead of a packaged one"
+    )
+    p_fetch.add_argument("--list", action="store_true", help="list packaged datasets and exit")
+    p_fetch.set_defaults(func=_fetch_dataset)
     return parser
 
 
@@ -92,24 +113,25 @@ def _predict(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     device = resolve_device(args.device)
     model, meta = load_checkpoint(args.model, device)
-    samples = load_wave(args.input)
+    samples = load_wave(args.input, meta["sample_rate"])
     output = predict(
         model, samples, meta["input_timesteps"], meta["output_timesteps"], config.batch_size, device
     )
-    save_wave(output, args.output)
+    save_wave(output, args.output, meta["sample_rate"])
     print(f"wrote {args.output} ({len(output)} samples)")
     return 0
 
 
 def _evaluate(args: argparse.Namespace) -> int:
-    target = load_wave(args.target)
     if args.model is not None:
         if args.input is None:
             raise ValueError("-i/--input is required together with -m/--model")
         device = resolve_device(args.device)
         batch_size = load_config(args.config).batch_size if args.config else 16
         model, meta = load_checkpoint(args.model, device)
-        samples = load_wave(args.input)
+        rate = meta["sample_rate"]
+        target = load_wave(args.target, rate)
+        samples = load_wave(args.input, rate)
         timesteps = (meta["input_timesteps"], meta["output_timesteps"])
         pred = predict(model, samples, *timesteps, batch_size, device)
         result: dict[str, object] = {
@@ -117,12 +139,19 @@ def _evaluate(args: argparse.Namespace) -> int:
             "epoch": meta["epoch"],
             "parameters": parameter_count(model),
             "device": device.type,
+            "sample_rate": rate,
             **evaluate_prediction(pred, target),
-            **time_inference(model, samples, *timesteps, batch_size, device),
+            **time_inference(model, samples, *timesteps, batch_size, device, sample_rate=rate),
         }
     else:
-        prediction = load_wave(args.prediction)
-        result = {"prediction": str(args.prediction), **evaluate_prediction(prediction, target)}
+        rate = args.sample_rate
+        target = load_wave(args.target, rate)
+        prediction = load_wave(args.prediction, rate)
+        result = {
+            "prediction": str(args.prediction),
+            "sample_rate": rate,
+            **evaluate_prediction(prediction, target),
+        }
     for key, value in result.items():
         print(f"{key:18s} {value:.6g}" if isinstance(value, float) else f"{key:18s} {value}")
     if args.json is not None:
@@ -133,7 +162,27 @@ def _evaluate(args: argparse.Namespace) -> int:
 def _import_keras(args: argparse.Namespace) -> int:
     model, epoch = load_keras_checkpoint(args.h5)
     save_checkpoint(
-        args.output, model, args.input_timesteps, args.output_timesteps, epoch, math.nan
+        args.output,
+        model,
+        args.input_timesteps,
+        args.output_timesteps,
+        epoch,
+        math.nan,
+        sample_rate=args.sample_rate,
     )
     print(f"wrote {args.output} (epoch {epoch}, {parameter_count(model)} parameters)")
+    return 0
+
+
+def _fetch_dataset(args: argparse.Namespace) -> int:
+    if args.list:
+        print("\n".join(list_datasets()))
+        return 0
+    if args.manifest is None and args.name is None:
+        raise ValueError("give a dataset name or --manifest (see --list)")
+    manifest = load_manifest(args.manifest or packaged_manifest(args.name))
+    root = fetch_dataset(manifest, args.dest)
+    print(f"{manifest.name}: {len(manifest.files)} files in {root}")
+    print(f"license: {manifest.license}")
+    print(f"citation: {manifest.citation}")
     return 0

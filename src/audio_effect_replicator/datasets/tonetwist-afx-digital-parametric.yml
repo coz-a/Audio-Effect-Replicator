@@ -1,0 +1,71 @@
+name: tonetwist-afx
+description: 'ToneTwisT AFx dataset, plugin effects sampled at several knob settings: dry/wet pairs at 48 kHz / 32-bit float with trainval and test splits. Each archive is extracted into a folder of its own name; the DRY input archive is shared by the subsets.'
+license: CC-BY-NC-4.0
+citation: 'M. Comunità, C. J. Steinmetz and J. D. Reiss, "Differentiable black-box and gray-box modeling of nonlinear audio effects", Frontiers in Signal Processing, 2025. Dataset: https://github.com/mcomunita/tonetwist-afx-dataset (each subset is a Zenodo record).'
+sample_rate: 48000
+files:
+- path: DRY-with-markers.zip
+  md5: bc1d1490f6c6cfe5643c0798eb5fb5a4
+  size: 865850744
+  extract: true
+  url: https://zenodo.org/records/10455730/files/DRY-with-markers.zip?download=1
+- path: MultidrivePedalPro-808-Scream.z01
+  md5: f94a3e94d0846b9cfb076e0d2ef94ce7
+  size: 4294967296
+  extract: true
+  url: https://zenodo.org/records/10901401/files/MultidrivePedalPro-808-Scream.z01?download=1
+- path: MultidrivePedalPro-808-Scream.z02
+  md5: eb1442b7a2eadc03caef920220a0c374
+  size: 4294967296
+  extract: true
+  url: https://zenodo.org/records/10901401/files/MultidrivePedalPro-808-Scream.z02?download=1
+- path: MultidrivePedalPro-808-Scream.zip
+  md5: 904e9690020fa937c4c1bcc40eb74b86
+  size: 1075766313
+  extract: true
+  url: https://zenodo.org/records/10901401/files/MultidrivePedalPro-808-Scream.zip?download=1
+- path: MultidrivePedalPro-B-Drive.z01
+  md5: 537a49fe73602e6999a9530a0ef08d2d
+  size: 4294967296
+  extract: true
+  url: https://zenodo.org/records/10901417/files/MultidrivePedalPro-B-Drive.z01?download=1
+- path: MultidrivePedalPro-B-Drive.z02
+  md5: 73cc36287e470ce9eece854e48c39841
+  size: 4294967296
+  extract: true
+  url: https://zenodo.org/records/10901417/files/MultidrivePedalPro-B-Drive.z02?download=1
+- path: MultidrivePedalPro-B-Drive.zip
+  md5: 8d6846bd14856bf2a56cbf603cf47455
+  size: 1083591746
+  extract: true
+  url: https://zenodo.org/records/10901417/files/MultidrivePedalPro-B-Drive.zip?download=1
+- path: MultidrivePedalPro-F-Fuzz.z01
+  md5: 32cd2d3c931400ab11544c001f3486e7
+  size: 4294967296
+  extract: true
+  url: https://zenodo.org/records/10901450/files/MultidrivePedalPro-F-Fuzz.z01?download=1
+- path: MultidrivePedalPro-F-Fuzz.zip
+  md5: 954b3be34a219075e19478e7669d0899
+  size: 709408105
+  extract: true
+  url: https://zenodo.org/records/10901450/files/MultidrivePedalPro-F-Fuzz.zip?download=1
+- path: MultidrivePedalPro-M-Distortion.z01
+  md5: 260c2ae7bc6f4c4210069ba428204dd9
+  size: 4294967296
+  extract: true
+  url: https://zenodo.org/records/10901455/files/MultidrivePedalPro-M-Distortion.z01?download=1
+- path: MultidrivePedalPro-M-Distortion.z02
+  md5: eb0632a5c2c20a7299ae29b8a1bfab54
+  size: 4294967296
+  extract: true
+  url: https://zenodo.org/records/10901455/files/MultidrivePedalPro-M-Distortion.z02?download=1
+- path: MultidrivePedalPro-M-Distortion.z03
+  md5: 4e3cff5aa5e9eb161d141bdce04255f2
+  size: 4294967296
+  extract: true
+  url: https://zenodo.org/records/10901455/files/MultidrivePedalPro-M-Distortion.z03?download=1
+- path: MultidrivePedalPro-M-Distortion.zip
+  md5: 5751c56564ecd78e7d62af0f4adc1bd1
+  size: 1397857182
+  extract: true
+  url: https://zenodo.org/records/10901455/files/MultidrivePedalPro-M-Distortion.zip?download=1
