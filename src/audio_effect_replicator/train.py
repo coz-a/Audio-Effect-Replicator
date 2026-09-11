@@ -8,16 +8,15 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 from audio_effect_replicator.config import Config
 from audio_effect_replicator.data import WindowSampler, load_pairs
-from audio_effect_replicator.loss import tail_mse
-from audio_effect_replicator.model import FxReplicator, save_checkpoint
+from audio_effect_replicator.loss import Loss, build_loss
+from audio_effect_replicator.model import build_model, save_checkpoint
 
 log = logging.getLogger(__name__)
-
-LEARNING_RATE = 1e-3
 
 
 def train(
@@ -46,20 +45,40 @@ def train(
     ckpt_dir.mkdir(parents=True)
     writer = SummaryWriter(str(out_dir / "tensorboard" / stamp))
 
-    model = FxReplicator().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    model = build_model(config.model).to(device)
+    loss_fn = build_loss(config.loss)
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+    log.info(
+        "model %s (hidden %d), loss %s, lr %g",
+        config.model.type,
+        config.model.hidden,
+        config.loss.type,
+        config.learning_rate,
+    )
     best = math.inf
     epochs_without_improvement = 0
 
     for epoch in range(1, config.max_epochs + 1):
         model.train()
         train_loss = _run_steps(
-            model, train_sampler, config.steps_per_epoch, config.output_timesteps, device, optimizer
+            model,
+            train_sampler,
+            config.steps_per_epoch,
+            config.output_timesteps,
+            device,
+            loss_fn,
+            optimizer,
         )
         model.eval()
         with torch.no_grad():
             val_loss = _run_steps(
-                model, val_sampler, config.validation_steps, config.output_timesteps, device, None
+                model,
+                val_sampler,
+                config.validation_steps,
+                config.output_timesteps,
+                device,
+                loss_fn,
+                None,
             )
         writer.add_scalar("loss/train", train_loss, epoch)
         writer.add_scalar("loss/val", val_loss, epoch)
@@ -91,18 +110,19 @@ def train(
 
 
 def _run_steps(
-    model: FxReplicator,
+    model: nn.Module,
     sampler: WindowSampler,
     steps: int,
     output_timesteps: int,
     device: torch.device,
+    loss_fn: Loss,
     optimizer: torch.optim.Optimizer | None,
 ) -> float:
     total = 0.0
     for _ in range(steps):
         x, y = sampler.sample()
         x, y = x.to(device), y.to(device)
-        loss = tail_mse(model(x), y, output_timesteps)
+        loss = loss_fn(model(x), y, output_timesteps)
         if optimizer is not None:
             optimizer.zero_grad()
             loss.backward()

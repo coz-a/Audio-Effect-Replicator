@@ -29,3 +29,11 @@ def test_wright2019_configs(device: str) -> None:
     assert c.val_data == [
         (data / "val" / f"{device}-input.wav", data / "val" / f"{device}-target.wav")
     ]
+
+
+@pytest.mark.parametrize("name", ["default", "wright2019-ht1", "wright2019-muff"])
+def test_shipped_configs_keep_the_2018_model_and_loss(name: str) -> None:
+    config = load_config(CONFIGS / f"{name}.yml")
+    assert (config.model.type, config.model.hidden) == ("lstm2018", 64)
+    assert config.loss.type == "tail_mse"
+    assert config.learning_rate == 1e-3

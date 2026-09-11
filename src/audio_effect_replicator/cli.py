@@ -5,11 +5,12 @@ import json
 import logging
 import math
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from audio_effect_replicator import __version__
 from audio_effect_replicator.audio import SAMPLE_RATE, load_wave, save_wave
-from audio_effect_replicator.config import ModelSpec, load_config
+from audio_effect_replicator.config import Config, LossSpec, ModelSpec, load_config
 from audio_effect_replicator.datasets import (
     fetch_dataset,
     list_datasets,
@@ -47,6 +48,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--out-dir", default=Path("."), type=Path, help="where checkpoint/ and tensorboard/ go"
     )
     p_train.add_argument("--seed", type=int, default=None)
+    p_train.add_argument("--model", help="override the config's model type")
+    p_train.add_argument("--hidden", type=int, help="override the config's hidden size")
+    p_train.add_argument("--loss", help="override the config's loss type")
+    p_train.add_argument("--learning-rate", type=float, help="override the config's learning rate")
     p_train.set_defaults(func=_train)
 
     p_predict = sub.add_parser("predict", help="apply a trained model to a WAV file")
@@ -102,11 +107,23 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _train(args: argparse.Namespace) -> int:
-    config = load_config(args.config)
+    config = _with_overrides(load_config(args.config), args)
     device = resolve_device(args.device)
     ckpt_dir = train(config, device, out_dir=args.out_dir, seed=args.seed)
     print(f"checkpoints written to {ckpt_dir}")
     return 0
+
+
+def _with_overrides(config: Config, args: argparse.Namespace) -> Config:
+    model = ModelSpec(
+        type=args.model or config.model.type, hidden=args.hidden or config.model.hidden
+    )
+    return replace(
+        config,
+        model=model,
+        loss=LossSpec(type=args.loss or config.loss.type),
+        learning_rate=args.learning_rate or config.learning_rate,
+    )
 
 
 def _predict(args: argparse.Namespace) -> int:
