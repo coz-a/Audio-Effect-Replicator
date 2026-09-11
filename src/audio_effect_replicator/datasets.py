@@ -4,7 +4,8 @@ Plain files are downloaded and MD5-checked in place. Archive entries (`extract: 
 are downloaded, checked, extracted into a folder named after the archive and then
 deleted; a `<archive>.md5` stamp records the verified checksum so later runs skip them.
 Split zips (`name.z01`, `name.z02`, ..., `name.zip`) are extracted with 7-Zip (`7z`),
-which reads multi-volume archives natively.
+which reads multi-volume archives natively. Downloads go through `axel` when it is
+installed, since hosts that throttle a single connection serve several much faster.
 """
 
 import hashlib
@@ -23,6 +24,7 @@ import yaml
 log = logging.getLogger(__name__)
 
 _PART = re.compile(r"\.z\d+$")
+_CONNECTIONS = 8
 
 
 @dataclass(frozen=True)
@@ -96,7 +98,7 @@ def fetch_dataset(manifest: Manifest, dest: Path) -> Path:
                 entry.path,
                 f" ({entry.size / 1e9:.1f} GB)" if entry.size else "",
             )
-            urllib.request.urlretrieve(entry.url, target)
+            _download(entry.url, target)
             if _md5(target) != entry.md5:
                 target.unlink()
                 raise RuntimeError(f"{entry.path}: checksum mismatch after download")
@@ -106,6 +108,21 @@ def fetch_dataset(manifest: Manifest, dest: Path) -> Path:
                 log.info("%s: extracting", entry.path)
                 _extract(target)
     return root
+
+
+def _download(url: str, target: Path) -> None:
+    """Fetch `url` into `target`, in parallel chunks when axel is installed."""
+    axel = shutil.which("axel") if url.startswith(("http://", "https://")) else None
+    if axel is None:
+        urllib.request.urlretrieve(url, target)
+        return
+    if target.exists() and not _axel_state(target).exists():
+        target.unlink()  # a leftover axel cannot resume
+    subprocess.run([axel, "-q", "-n", str(_CONNECTIONS), "-o", str(target), url], check=True)
+
+
+def _axel_state(target: Path) -> Path:
+    return target.with_name(target.name + ".st")
 
 
 def _already_done(entry: DatasetFile, target: Path) -> bool:

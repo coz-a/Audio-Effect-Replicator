@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from audio_effect_replicator import datasets
 from audio_effect_replicator.datasets import (
     Manifest,
     fetch_dataset,
@@ -199,3 +200,63 @@ def test_fetch_reuses_a_verified_archive_without_downloading(tmp_path: Path) -> 
     fetch_dataset(m, tmp_path / "data")
     assert (root / "Effect" / "Effect" / "test" / "x.wav").exists()
     assert (root / "Effect.zip.md5").read_text().strip() == m.files[0].md5
+
+
+def test_download_uses_axel_with_parallel_connections(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commands: list[list[str]] = []
+    monkeypatch.setattr(datasets.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(datasets.subprocess, "run", lambda cmd, **kw: commands.append(cmd))
+    target = tmp_path / "x.zip"
+    datasets._download("https://example.invalid/x.zip", target)
+    assert commands == [
+        ["/usr/bin/axel", "-q", "-n", "8", "-o", str(target), "https://example.invalid/x.zip"]
+    ]
+
+
+def test_download_does_not_use_axel_for_local_urls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """axel speaks HTTP and FTP only, so a file:// manifest must go through urllib."""
+    monkeypatch.setattr(datasets.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(datasets.subprocess, "run", lambda cmd, **kw: pytest.fail("ran " + cmd[0]))
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"payload")
+    target = tmp_path / "copy.bin"
+    datasets._download(source.as_uri(), target)
+    assert target.read_bytes() == b"payload"
+
+
+def test_download_falls_back_to_urllib_without_axel(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(datasets.shutil, "which", lambda name: None)
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"payload")
+    target = tmp_path / "copy.bin"
+    datasets._download(source.as_uri(), target)
+    assert target.read_bytes() == b"payload"
+
+
+def test_download_discards_a_partial_file_axel_cannot_resume(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(datasets.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(datasets.subprocess, "run", lambda cmd, **kw: None)
+    orphan = tmp_path / "orphan.zip"
+    orphan.write_bytes(b"partial")
+    datasets._download("https://example.invalid/orphan.zip", orphan)
+    assert not orphan.exists()
+
+
+def test_download_keeps_a_partial_file_axel_can_resume(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(datasets.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(datasets.subprocess, "run", lambda cmd, **kw: None)
+    target = tmp_path / "resumable.zip"
+    target.write_bytes(b"partial")
+    target.with_name("resumable.zip.st").write_bytes(b"axel state")
+    datasets._download("https://example.invalid/resumable.zip", target)
+    assert target.read_bytes() == b"partial"
