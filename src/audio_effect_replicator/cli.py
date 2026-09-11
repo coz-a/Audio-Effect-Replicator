@@ -52,6 +52,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p_train.add_argument("--hidden", type=int, help="override the config's hidden size")
     p_train.add_argument("--loss", help="override the config's loss type")
     p_train.add_argument("--learning-rate", type=float, help="override the config's learning rate")
+    p_train.add_argument(
+        "--grad-clip", type=float, help="override the config's gradient-norm clip (0 disables)"
+    )
     p_train.set_defaults(func=_train)
 
     p_predict = sub.add_parser("predict", help="apply a trained model to a WAV file")
@@ -123,6 +126,7 @@ def _with_overrides(config: Config, args: argparse.Namespace) -> Config:
         model=model,
         loss=LossSpec(type=args.loss or config.loss.type),
         learning_rate=args.learning_rate or config.learning_rate,
+        grad_clip=config.grad_clip if args.grad_clip is None else args.grad_clip,
     )
 
 

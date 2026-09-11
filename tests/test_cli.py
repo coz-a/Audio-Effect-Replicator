@@ -179,6 +179,7 @@ def test_train_overrides_the_model_and_loss(tmp_path: Path, config_file: Path) -
     out_dir = tmp_path / "run"
     args = ["train", "-c", str(config_file), "--device", "cpu", "--out-dir", str(out_dir)]
     overrides = ["--model", "wright", "--hidden", "8", "--loss", "esr", "--learning-rate", "0.0005"]
+    overrides += ["--grad-clip", "1.0"]
     assert main([*args, "--seed", "0", *overrides]) == 0
     checkpoint = sorted((out_dir / "checkpoint").glob("*/model_*.pt"))[-1]
     _, meta = load_checkpoint(checkpoint, torch.device("cpu"))
