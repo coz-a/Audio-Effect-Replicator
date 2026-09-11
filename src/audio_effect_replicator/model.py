@@ -82,7 +82,8 @@ def _init_like_keras(lstm: nn.LSTM) -> None:
 
 def save_checkpoint(
     path: str | Path,
-    model: FxReplicator,
+    model: nn.Module,
+    spec: ModelSpec,
     input_timesteps: int,
     output_timesteps: int,
     epoch: int,
@@ -92,7 +93,8 @@ def save_checkpoint(
     torch.save(
         {
             "version": CHECKPOINT_VERSION,
-            "hidden": model.hidden,
+            "hidden": spec.hidden,  # kept for checkpoints read by older versions
+            "model": {"type": spec.type, "hidden": spec.hidden},
             "input_timesteps": input_timesteps,
             "output_timesteps": output_timesteps,
             "sample_rate": sample_rate,
@@ -104,10 +106,11 @@ def save_checkpoint(
     )
 
 
-def load_checkpoint(path: str | Path, device: torch.device) -> tuple[FxReplicator, dict[str, Any]]:
+def load_checkpoint(path: str | Path, device: torch.device) -> tuple[nn.Module, dict[str, Any]]:
     meta: dict[str, Any] = torch.load(path, map_location=device, weights_only=True)
     meta.setdefault("sample_rate", SAMPLE_RATE)  # checkpoints written before sample_rate existed
-    model = FxReplicator(hidden=meta["hidden"]).to(device)
+    meta.setdefault("model", {"type": "lstm2018", "hidden": meta["hidden"]})
+    model = build_model(ModelSpec(**meta["model"])).to(device)
     model.load_state_dict(meta["model_state_dict"])
     model.eval()
     return model, meta

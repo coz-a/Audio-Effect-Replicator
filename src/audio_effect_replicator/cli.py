@@ -9,7 +9,7 @@ from pathlib import Path
 
 from audio_effect_replicator import __version__
 from audio_effect_replicator.audio import SAMPLE_RATE, load_wave, save_wave
-from audio_effect_replicator.config import load_config
+from audio_effect_replicator.config import ModelSpec, load_config
 from audio_effect_replicator.datasets import (
     fetch_dataset,
     list_datasets,
@@ -164,6 +164,7 @@ def _import_keras(args: argparse.Namespace) -> int:
     save_checkpoint(
         args.output,
         model,
+        ModelSpec(hidden=model.hidden),
         args.input_timesteps,
         args.output_timesteps,
         epoch,

@@ -70,6 +70,7 @@ def train(
             save_checkpoint(
                 ckpt_dir / f"model_{epoch:06d}.pt",
                 model,
+                config.model,
                 config.input_timesteps,
                 config.output_timesteps,
                 epoch,
