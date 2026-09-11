@@ -86,3 +86,47 @@ def test_sample_rate_is_read(tmp_path: Path) -> None:
         "train_data:\n  - [a.wav, b.wav]\nval_data:\n  - [a.wav, b.wav]\n"
     )
     assert load_config(path).sample_rate == 44100
+
+
+def test_model_and_loss_default_to_the_2018_setup(config_file: Path) -> None:
+    config = load_config(config_file)
+    assert (config.model.type, config.model.hidden) == ("lstm2018", 64)
+    assert config.loss.type == "tail_mse"
+    assert config.learning_rate == 1e-3
+
+
+def test_model_and_loss_blocks_are_read(tmp_path: Path) -> None:
+    path = tmp_path / "c.yml"
+    path.write_text(
+        "input_timesteps: 10\noutput_timesteps: 5\nbatch_size: 1\nmax_epochs: 1\npatience: 1\n"
+        "learning_rate: 0.0005\n"
+        "model:\n  type: wright\n  hidden: 32\n"
+        "loss:\n  type: esr\n"
+        "train_data:\n  - [a.wav, b.wav]\nval_data:\n  - [a.wav, b.wav]\n"
+    )
+    config = load_config(path)
+    assert (config.model.type, config.model.hidden) == ("wright", 32)
+    assert config.loss.type == "esr"
+    assert config.learning_rate == 0.0005
+
+
+def test_unknown_top_level_key_is_config_error(tmp_path: Path) -> None:
+    path = tmp_path / "c.yml"
+    path.write_text(
+        "input_timesteps: 10\noutput_timesteps: 5\nbatch_size: 1\nmax_epochs: 1\npatience: 1\n"
+        "modle:\n  type: wright\n"
+        "train_data:\n  - [a.wav, b.wav]\nval_data:\n  - [a.wav, b.wav]\n"
+    )
+    with pytest.raises(ConfigError, match="modle"):
+        load_config(path)
+
+
+def test_model_block_must_be_a_mapping(tmp_path: Path) -> None:
+    path = tmp_path / "c.yml"
+    path.write_text(
+        "input_timesteps: 10\noutput_timesteps: 5\nbatch_size: 1\nmax_epochs: 1\npatience: 1\n"
+        "model: wright\n"
+        "train_data:\n  - [a.wav, b.wav]\nval_data:\n  - [a.wav, b.wav]\n"
+    )
+    with pytest.raises(ConfigError, match="model"):
+        load_config(path)
