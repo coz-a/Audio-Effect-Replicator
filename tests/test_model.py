@@ -1,8 +1,17 @@
 from pathlib import Path
 
+import pytest
 import torch
 
-from audio_effect_replicator.model import FxReplicator, load_checkpoint, save_checkpoint
+from audio_effect_replicator.config import ModelSpec
+from audio_effect_replicator.model import (
+    FxReplicator,
+    SkipLstm,
+    WrightLstm,
+    build_model,
+    load_checkpoint,
+    save_checkpoint,
+)
 
 
 def test_forward_shape() -> None:
@@ -79,3 +88,31 @@ def test_old_checkpoint_without_sample_rate_defaults_to_48000(tmp_path: Path) ->
         path,
     )
     assert load_checkpoint(path, torch.device("cpu"))[1]["sample_rate"] == 48000
+
+
+def test_wright_lstm_shape_and_size() -> None:
+    model = WrightLstm(hidden=64)
+    assert model(torch.zeros(2, 32, 1)).shape == (2, 32, 1)
+    # one LSTM layer 4*(1*64 + 64*64 + 2*64) = 17152, plus a 64 -> 1 linear head
+    assert sum(p.numel() for p in model.parameters()) == 17_217
+
+
+def test_skip_lstm_adds_the_input() -> None:
+    model = SkipLstm(hidden=8)
+    with torch.no_grad():
+        model.inner.head.weight.zero_()
+        model.inner.head.bias.zero_()
+    x = torch.randn(2, 16, 1)
+    torch.testing.assert_close(model(x), x)
+
+
+def test_build_model_returns_each_architecture() -> None:
+    assert isinstance(build_model(ModelSpec()), FxReplicator)
+    assert isinstance(build_model(ModelSpec(type="wright", hidden=32)), WrightLstm)
+    assert isinstance(build_model(ModelSpec(type="skip", hidden=32)), SkipLstm)
+    assert build_model(ModelSpec(type="wright", hidden=32)).hidden == 32
+
+
+def test_build_model_rejects_an_unknown_type() -> None:
+    with pytest.raises(ValueError, match="lstm2018"):
+        build_model(ModelSpec(type="nope"))

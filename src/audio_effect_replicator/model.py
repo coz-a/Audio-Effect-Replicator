@@ -7,6 +7,7 @@ import torch
 from torch import nn
 
 from audio_effect_replicator.audio import SAMPLE_RATE
+from audio_effect_replicator.config import ModelSpec
 
 CHECKPOINT_VERSION = 1
 
@@ -26,6 +27,42 @@ class FxReplicator(nn.Module):
         h, _ = self.lstm2(h)
         y, _ = self.lstm_out(h)
         return y
+
+
+class WrightLstm(nn.Module):
+    """One LSTM layer and a linear output, as in Wright et al., DAFx 2019."""
+
+    def __init__(self, hidden: int = 64) -> None:
+        super().__init__()
+        self.hidden = hidden
+        self.lstm = nn.LSTM(1, hidden, batch_first=True)
+        self.head = nn.Linear(hidden, 1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h, _ = self.lstm(x)
+        return self.head(h)
+
+
+class SkipLstm(nn.Module):
+    """WrightLstm predicting only the difference from the input."""
+
+    def __init__(self, hidden: int = 64) -> None:
+        super().__init__()
+        self.hidden = hidden
+        self.inner = WrightLstm(hidden)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.inner(x) + x
+
+
+def build_model(spec: ModelSpec) -> nn.Module:
+    if spec.type == "lstm2018":
+        return FxReplicator(hidden=spec.hidden)
+    if spec.type == "wright":
+        return WrightLstm(hidden=spec.hidden)
+    if spec.type == "skip":
+        return SkipLstm(hidden=spec.hidden)
+    raise ValueError(f"unknown model type {spec.type!r}; use lstm2018, wright or skip")
 
 
 def _init_like_keras(lstm: nn.LSTM) -> None:
