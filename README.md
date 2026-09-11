@@ -48,6 +48,11 @@ Output waveform (48 kHz, mono)
   last 480 output samples are kept and concatenated; the output has exactly
   the length of the input.
 
+Two other architectures can be selected in the config: `wright` is the single
+LSTM layer with a linear output of Wright et al. (2019), and `skip` is that
+model predicting only the difference from its input. `lstm2018` is the default
+and reproduces the original stack.
+
 Weights are initialized as in Keras 2.1 (glorot-uniform input kernels,
 orthogonal recurrent kernels, forget-gate bias 1); with PyTorch's default
 initialization this stack barely trains. Runs are still not bit-identical to
@@ -109,6 +114,35 @@ zero-padded to six digits, best validation loss only) and TensorBoard logs to
 without improvement in validation loss. `--device cpu|cuda|mps` overrides the
 automatic choice; `--seed N` makes the run reproducible.
 
+The model, the loss and gradient clipping are set in the config, or overridden
+on the command line for a sweep:
+
+```yaml
+model:
+  type: skip        # lstm2018 (default), wright or skip
+  hidden: 64
+loss:
+  type: esr         # tail_mse (default), esr or esr_preemphasis
+learning_rate: 0.001
+grad_clip: 0        # 0 disables clipping, as in the 2018 method
+```
+
+```sh
+uv run aer train -c configs/wright2019-ht1.yml --model wright --grad-clip 20
+```
+
+`esr` is the error-to-signal ratio and `esr_preemphasis` adds the first-order
+high-pass and the DC term of the DAFx 2019 loss. All three are computed over
+the same last `output_timesteps` samples of each window.
+
+Backpropagating through a 5280-sample window occasionally produces an
+exploding gradient that drives the LSTM to a silent output it never recovers
+from: a gradient norm of 1094 was measured against a typical maximum of 13,
+and early stopping then keeps the checkpoint from before the collapse.
+`grad_clip` bounds that step. It is off by default because the 2018 method did
+not clip; the benchmarks below use 20, above the normal range and far below
+the spike.
+
 ## Inference
 
 ```sh
@@ -140,20 +174,33 @@ Reported values (add `--json scores.json` to save them):
 
 ## Benchmarks
 
-Test-set scores of the 2018 method (this code, `configs/wright2019-*.yml`:
-the 2018 settings at 44.1 kHz) on the `wright2019` data. One run each with
-seed 0; no pre-trained weights are shipped.
+Test-set scores on the `wright2019` data: median of three seeds, range in
+brackets. Training follows the 2018 procedure (random windows, state reset per
+window, loss over the last 480 samples) with `--grad-clip 20`. No pre-trained
+weights are shipped.
 
-| Device | Model | Parameters | ESR | MSE | LSD (dB) |
-| --- | --- | --- | --- | --- | --- |
-| Blackstar HT-1 | LSTM 64-64-1, MSE loss, sliding window (2018 method) | 50,700 | 2.97 % | 0.00297 | 13.97 |
-| Big Muff Pi | LSTM 64-64-1, MSE loss, sliding window (2018 method) | 50,700 | 11.1 % | 0.00028 | 8.65 |
+| Device | Model | Parameters | ESR | LSD (dB) |
+| --- | --- | --- | --- | --- |
+| Blackstar HT-1 | LSTM 64-64-1 (2018 method) | 50,700 | 3.1 % (2.5-3.7) | 14.0 |
+| Blackstar HT-1 | Wright LSTM-64 | 17,217 | 2.7 % (2.5-4.2) | 10.3 |
+| Blackstar HT-1 | Skip LSTM-64 | 17,217 | 3.3 % (3.2-4.7) | 10.5 |
+| Blackstar HT-1 | Skip LSTM-64, ESR + pre-emphasis loss | 17,217 | 6.5 % (5.0-17.5) | 11.3 |
+| Big Muff Pi | LSTM 64-64-1 (2018 method) | 50,700 | 10.0 % (9.4-11.1) | 8.6 |
+| Big Muff Pi | Wright LSTM-64 | 17,217 | 25.2 % (12.6-27.5) | 19.4 |
+| Big Muff Pi | Skip LSTM-64 | 17,217 | 17.4 % (11.8-29.0) | 12.9 |
+| Big Muff Pi | Skip LSTM-64, ESR + pre-emphasis loss | 17,217 | 15.4 % (11.0-24.1) | 12.5 |
 
-For reference, Wright et al. (2019) report test ESR of 1.8 % (HT-1) and
-4.1 % (Big Muff) for their single-layer LSTM-64 with a linear output trained
-with an ESR + pre-emphasis loss, and 0.79 % / 9.2 % for their best WaveNet
-models. Their models were trained on five control settings with a
-conditioning input, so the comparison is indicative only.
+On the amplifier a single LSTM layer matches the three-layer stack with a
+third of the parameters and a clearly lower spectral error. On the fuzz pedal
+it does not: the single-layer models land anywhere between 12 % and 29 %
+depending on the seed, while the three-layer stack stays within 9-11 %. The
+pre-emphasised loss does not help under this training procedure.
+
+For reference, Wright et al. (2019) report test ESR of 1.8 % (HT-1) and 4.1 %
+(Big Muff) for an LSTM-64 with a linear output, and 0.79 % / 9.2 % for their
+best WaveNet models. They trained on five control settings with a conditioning
+input and with a stateful procedure that is not reproduced here, so the
+comparison is indicative only.
 
 ## Development
 

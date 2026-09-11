@@ -1,8 +1,17 @@
 from pathlib import Path
 
+import pytest
 import torch
 
-from audio_effect_replicator.model import FxReplicator, load_checkpoint, save_checkpoint
+from audio_effect_replicator.config import ModelSpec
+from audio_effect_replicator.model import (
+    FxReplicator,
+    SkipLstm,
+    WrightLstm,
+    build_model,
+    load_checkpoint,
+    save_checkpoint,
+)
 
 
 def test_forward_shape() -> None:
@@ -22,7 +31,7 @@ def test_checkpoint_roundtrip(tmp_path: Path) -> None:
     model = FxReplicator()
     x = torch.randn(1, 16, 1)
     path = tmp_path / "model_000003.pt"
-    save_checkpoint(path, model, 64, 16, epoch=3, val_loss=0.5)
+    save_checkpoint(path, model, ModelSpec(), 64, 16, epoch=3, val_loss=0.5)
     loaded, meta = load_checkpoint(path, torch.device("cpu"))
     torch.testing.assert_close(loaded(x), model(x))
     assert meta["epoch"] == 3
@@ -59,7 +68,9 @@ def test_init_input_weights_are_glorot_bounded() -> None:
 def test_checkpoint_stores_sample_rate(tmp_path: Path) -> None:
     path = tmp_path / "m.pt"
     model = FxReplicator(hidden=4)
-    save_checkpoint(path, model, 64, 16, epoch=1, val_loss=0.1, sample_rate=44100)
+    save_checkpoint(
+        path, model, ModelSpec(hidden=4), 64, 16, epoch=1, val_loss=0.1, sample_rate=44100
+    )
     assert load_checkpoint(path, torch.device("cpu"))[1]["sample_rate"] == 44100
 
 
@@ -79,3 +90,64 @@ def test_old_checkpoint_without_sample_rate_defaults_to_48000(tmp_path: Path) ->
         path,
     )
     assert load_checkpoint(path, torch.device("cpu"))[1]["sample_rate"] == 48000
+
+
+def test_wright_lstm_shape_and_size() -> None:
+    model = WrightLstm(hidden=64)
+    assert model(torch.zeros(2, 32, 1)).shape == (2, 32, 1)
+    # one LSTM layer 4*(1*64 + 64*64 + 2*64) = 17152, plus a 64 -> 1 linear head
+    assert sum(p.numel() for p in model.parameters()) == 17_217
+
+
+def test_skip_lstm_adds_the_input() -> None:
+    model = SkipLstm(hidden=8)
+    with torch.no_grad():
+        model.inner.head.weight.zero_()
+        model.inner.head.bias.zero_()
+    x = torch.randn(2, 16, 1)
+    torch.testing.assert_close(model(x), x)
+
+
+def test_build_model_returns_each_architecture() -> None:
+    assert isinstance(build_model(ModelSpec()), FxReplicator)
+    assert isinstance(build_model(ModelSpec(type="wright", hidden=32)), WrightLstm)
+    assert isinstance(build_model(ModelSpec(type="skip", hidden=32)), SkipLstm)
+    assert build_model(ModelSpec(type="wright", hidden=32)).hidden == 32
+
+
+def test_build_model_rejects_an_unknown_type() -> None:
+    with pytest.raises(ValueError, match="lstm2018"):
+        build_model(ModelSpec(type="nope"))
+
+
+def test_checkpoint_round_trip_for_a_wright_model(tmp_path: Path) -> None:
+    spec = ModelSpec(type="wright", hidden=8)
+    model = build_model(spec)
+    x = torch.randn(1, 16, 1)
+    path = tmp_path / "m.pt"
+    save_checkpoint(path, model, spec, 64, 16, epoch=2, val_loss=0.25)
+    loaded, meta = load_checkpoint(path, torch.device("cpu"))
+    assert isinstance(loaded, WrightLstm)
+    assert meta["model"] == {"type": "wright", "hidden": 8}
+    torch.testing.assert_close(loaded(x), model(x))
+
+
+def test_old_checkpoint_without_a_model_block_is_the_2018_model(tmp_path: Path) -> None:
+    model = FxReplicator(hidden=4)
+    path = tmp_path / "old.pt"
+    torch.save(
+        {
+            "version": 1,
+            "hidden": 4,
+            "input_timesteps": 64,
+            "output_timesteps": 16,
+            "sample_rate": 48000,
+            "epoch": 1,
+            "val_loss": 0.1,
+            "model_state_dict": model.state_dict(),
+        },
+        path,
+    )
+    loaded, meta = load_checkpoint(path, torch.device("cpu"))
+    assert isinstance(loaded, FxReplicator)
+    assert meta["model"] == {"type": "lstm2018", "hidden": 4}

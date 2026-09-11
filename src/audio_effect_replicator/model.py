@@ -7,6 +7,7 @@ import torch
 from torch import nn
 
 from audio_effect_replicator.audio import SAMPLE_RATE
+from audio_effect_replicator.config import ModelSpec
 
 CHECKPOINT_VERSION = 1
 
@@ -28,6 +29,42 @@ class FxReplicator(nn.Module):
         return y
 
 
+class WrightLstm(nn.Module):
+    """One LSTM layer and a linear output, as in Wright et al., DAFx 2019."""
+
+    def __init__(self, hidden: int = 64) -> None:
+        super().__init__()
+        self.hidden = hidden
+        self.lstm = nn.LSTM(1, hidden, batch_first=True)
+        self.head = nn.Linear(hidden, 1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h, _ = self.lstm(x)
+        return self.head(h)
+
+
+class SkipLstm(nn.Module):
+    """WrightLstm predicting only the difference from the input."""
+
+    def __init__(self, hidden: int = 64) -> None:
+        super().__init__()
+        self.hidden = hidden
+        self.inner = WrightLstm(hidden)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.inner(x) + x
+
+
+def build_model(spec: ModelSpec) -> nn.Module:
+    if spec.type == "lstm2018":
+        return FxReplicator(hidden=spec.hidden)
+    if spec.type == "wright":
+        return WrightLstm(hidden=spec.hidden)
+    if spec.type == "skip":
+        return SkipLstm(hidden=spec.hidden)
+    raise ValueError(f"unknown model type {spec.type!r}; use lstm2018, wright or skip")
+
+
 def _init_like_keras(lstm: nn.LSTM) -> None:
     """Keras 2.1 LSTM defaults: glorot_uniform input kernel, orthogonal recurrent kernel
     (per gate), zero biases with the forget gate bias set to 1. With PyTorch's default
@@ -45,7 +82,8 @@ def _init_like_keras(lstm: nn.LSTM) -> None:
 
 def save_checkpoint(
     path: str | Path,
-    model: FxReplicator,
+    model: nn.Module,
+    spec: ModelSpec,
     input_timesteps: int,
     output_timesteps: int,
     epoch: int,
@@ -55,7 +93,8 @@ def save_checkpoint(
     torch.save(
         {
             "version": CHECKPOINT_VERSION,
-            "hidden": model.hidden,
+            "hidden": spec.hidden,  # kept for checkpoints read by older versions
+            "model": {"type": spec.type, "hidden": spec.hidden},
             "input_timesteps": input_timesteps,
             "output_timesteps": output_timesteps,
             "sample_rate": sample_rate,
@@ -67,10 +106,11 @@ def save_checkpoint(
     )
 
 
-def load_checkpoint(path: str | Path, device: torch.device) -> tuple[FxReplicator, dict[str, Any]]:
+def load_checkpoint(path: str | Path, device: torch.device) -> tuple[nn.Module, dict[str, Any]]:
     meta: dict[str, Any] = torch.load(path, map_location=device, weights_only=True)
     meta.setdefault("sample_rate", SAMPLE_RATE)  # checkpoints written before sample_rate existed
-    model = FxReplicator(hidden=meta["hidden"]).to(device)
+    meta.setdefault("model", {"type": "lstm2018", "hidden": meta["hidden"]})
+    model = build_model(ModelSpec(**meta["model"])).to(device)
     model.load_state_dict(meta["model_state_dict"])
     model.eval()
     return model, meta

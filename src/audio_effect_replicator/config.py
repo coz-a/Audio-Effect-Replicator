@@ -1,13 +1,25 @@
 """Training / inference configuration loaded from YAML (same keys as the 2018 config.yml)."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import yaml
 
 
 class ConfigError(ValueError):
     """The YAML file is missing keys or holds inconsistent values."""
+
+
+@dataclass(frozen=True)
+class ModelSpec:
+    type: str = "lstm2018"
+    hidden: int = 64
+
+
+@dataclass(frozen=True)
+class LossSpec:
+    type: str = "tail_mse"
 
 
 @dataclass(frozen=True)
@@ -22,6 +34,10 @@ class Config:
     steps_per_epoch: int = 100
     validation_steps: int = 10
     sample_rate: int = 48000
+    learning_rate: float = 1e-3
+    grad_clip: float = 0.0  # 0 disables clipping, as in the 2018 method
+    model: ModelSpec = field(default_factory=ModelSpec)
+    loss: LossSpec = field(default_factory=LossSpec)
 
 
 _REQUIRED = (
@@ -34,6 +50,16 @@ _REQUIRED = (
     "val_data",
 )
 
+_OPTIONAL = (
+    "steps_per_epoch",
+    "validation_steps",
+    "sample_rate",
+    "learning_rate",
+    "grad_clip",
+    "model",
+    "loss",
+)
+
 
 def load_config(path: str | Path) -> Config:
     with open(path, encoding="utf-8") as f:
@@ -43,6 +69,9 @@ def load_config(path: str | Path) -> Config:
     missing = [key for key in _REQUIRED if key not in raw]
     if missing:
         raise ConfigError(f"{path}: missing keys: {', '.join(missing)}")
+    unknown = [key for key in raw if key not in _REQUIRED and key not in _OPTIONAL]
+    if unknown:
+        raise ConfigError(f"{path}: unknown keys: {', '.join(sorted(unknown))}")
     config = Config(
         input_timesteps=int(raw["input_timesteps"]),
         output_timesteps=int(raw["output_timesteps"]),
@@ -54,6 +83,10 @@ def load_config(path: str | Path) -> Config:
         steps_per_epoch=int(raw.get("steps_per_epoch", 100)),
         validation_steps=int(raw.get("validation_steps", 10)),
         sample_rate=int(raw.get("sample_rate", 48000)),
+        learning_rate=float(raw.get("learning_rate", 1e-3)),
+        grad_clip=float(raw.get("grad_clip", 0.0)),
+        model=_model_spec(raw.get("model")),
+        loss=_loss_spec(raw.get("loss")),
     )
     if config.output_timesteps > config.input_timesteps:
         raise ConfigError("output_timesteps must not exceed input_timesteps")
@@ -69,3 +102,23 @@ def _pairs(items: object, key: str) -> list[tuple[Path, Path]]:
             raise ConfigError(f"{key} entries must be [input, output] pairs")
         pairs.append((Path(item[0]), Path(item[1])))
     return pairs
+
+
+def _model_spec(raw: object) -> ModelSpec:
+    block = _block(raw, "model", ("type", "hidden"))
+    return ModelSpec(type=str(block.get("type", "lstm2018")), hidden=int(block.get("hidden", 64)))
+
+
+def _loss_spec(raw: object) -> LossSpec:
+    return LossSpec(type=str(_block(raw, "loss", ("type",)).get("type", "tail_mse")))
+
+
+def _block(raw: object, key: str, allowed: tuple[str, ...]) -> dict[str, Any]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{key} must be a mapping with keys {', '.join(allowed)}")
+    unknown = [k for k in raw if k not in allowed]
+    if unknown:
+        raise ConfigError(f"{key}: unknown keys: {', '.join(sorted(unknown))}")
+    return raw

@@ -4,11 +4,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 import soundfile
+import torch
 import yaml
 
 from audio_effect_replicator import __version__
 from audio_effect_replicator.audio import load_wave, save_wave
 from audio_effect_replicator.cli import main
+from audio_effect_replicator.model import load_checkpoint
 
 
 def train_on_cpu(config_file: Path, out_dir: Path) -> Path:
@@ -171,3 +173,14 @@ def test_fetch_dataset_list(capsys: pytest.CaptureFixture[str]) -> None:
 def test_fetch_dataset_requires_a_name(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["fetch-dataset"]) == 1
     assert "error:" in capsys.readouterr().err
+
+
+def test_train_overrides_the_model_and_loss(tmp_path: Path, config_file: Path) -> None:
+    out_dir = tmp_path / "run"
+    args = ["train", "-c", str(config_file), "--device", "cpu", "--out-dir", str(out_dir)]
+    overrides = ["--model", "wright", "--hidden", "8", "--loss", "esr", "--learning-rate", "0.0005"]
+    overrides += ["--grad-clip", "1.0"]
+    assert main([*args, "--seed", "0", *overrides]) == 0
+    checkpoint = sorted((out_dir / "checkpoint").glob("*/model_*.pt"))[-1]
+    _, meta = load_checkpoint(checkpoint, torch.device("cpu"))
+    assert meta["model"] == {"type": "wright", "hidden": 8}
