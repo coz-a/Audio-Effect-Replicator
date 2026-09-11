@@ -1,0 +1,24 @@
+name: wright2019
+description: >-
+  Blackstar HT-1 amplifier and Electro-Harmonix Big Muff Pi input/target pairs
+  (44.1 kHz, mono, 16-bit) with the train / val / test split used in Wright et al., DAFx 2019.
+license: CC-BY-NC-4.0
+citation: >-
+  A. Wright, E.-P. Damskägg and V. Välimäki, "Real-Time Black-Box Modelling with
+  Recurrent Neural Networks", Proc. DAFx 2019.
+  Data: https://github.com/Alec-Wright/Automated-GuitarAmpModelling
+  (also https://doi.org/10.5281/zenodo.10794425).
+sample_rate: 44100
+files:
+  - {path: train/ht1-input.wav, md5: 4cb37c951cba22dce51dc2624db13766, url: https://raw.githubusercontent.com/Alec-Wright/Automated-GuitarAmpModelling/main/Data/train/ht1-input.wav}
+  - {path: train/ht1-target.wav, md5: 61b21eb6efddd41ce8a4a73674e8ea22, url: https://raw.githubusercontent.com/Alec-Wright/Automated-GuitarAmpModelling/main/Data/train/ht1-target.wav}
+  - {path: train/muff-input.wav, md5: f9f4fbcb1ef509a94df027e91b0f2b26, url: https://raw.githubusercontent.com/Alec-Wright/Automated-GuitarAmpModelling/main/Data/train/muff-input.wav}
+  - {path: train/muff-target.wav, md5: 8ab707669b77500cc8494a9f37380cdd, url: https://raw.githubusercontent.com/Alec-Wright/Automated-GuitarAmpModelling/main/Data/train/muff-target.wav}
+  - {path: val/ht1-input.wav, md5: 3c0e7a3d035233bbb99c1a0081a722c3, url: https://raw.githubusercontent.com/Alec-Wright/Automated-GuitarAmpModelling/main/Data/val/ht1-input.wav}
+  - {path: val/ht1-target.wav, md5: a06a76eedf6895b2b9f7a8f0754e1b9e, url: https://raw.githubusercontent.com/Alec-Wright/Automated-GuitarAmpModelling/main/Data/val/ht1-target.wav}
+  - {path: val/muff-input.wav, md5: 1cdc0c7a508d803f3767b812fee493b8, url: https://raw.githubusercontent.com/Alec-Wright/Automated-GuitarAmpModelling/main/Data/val/muff-input.wav}
+  - {path: val/muff-target.wav, md5: d13840caca9f3dfcbda4e548d7f710d5, url: https://raw.githubusercontent.com/Alec-Wright/Automated-GuitarAmpModelling/main/Data/val/muff-target.wav}
+  - {path: test/ht1-input.wav, md5: 09832324e1bf049967ccfaa869505a48, url: https://raw.githubusercontent.com/Alec-Wright/Automated-GuitarAmpModelling/main/Data/test/ht1-input.wav}
+  - {path: test/ht1-target.wav, md5: d6b11eb3af8995e0b6e09ca141636252, url: https://raw.githubusercontent.com/Alec-Wright/Automated-GuitarAmpModelling/main/Data/test/ht1-target.wav}
+  - {path: test/muff-input.wav, md5: bd2d0466cc1171cdd9b8dc2720df0e4c, url: https://raw.githubusercontent.com/Alec-Wright/Automated-GuitarAmpModelling/main/Data/test/muff-input.wav}
+  - {path: test/muff-target.wav, md5: 33aa4baa9e0b4a17cbda41588cf4baf4, url: https://raw.githubusercontent.com/Alec-Wright/Automated-GuitarAmpModelling/main/Data/test/muff-target.wav}

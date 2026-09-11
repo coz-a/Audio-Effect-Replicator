@@ -151,3 +151,23 @@ def test_predict_writes_the_checkpoint_sample_rate(tmp_path: Path) -> None:
     args = ["predict", "-c", str(config), "-i", str(tmp_path / "x.wav"), "-o", str(out)]
     assert main([*args, "-m", str(model), "--device", "cpu"]) == 0
     assert soundfile.info(str(out)).samplerate == 44100
+
+
+def test_fetch_dataset_cli(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from tests.test_datasets import local_manifest
+
+    manifest = local_manifest(tmp_path)
+    args = ["fetch-dataset", "--manifest", str(manifest), "--dest", str(tmp_path / "data")]
+    assert main(args) == 0
+    assert (tmp_path / "data" / "toy" / "a.wav").exists()
+    assert "license: L" in capsys.readouterr().out
+
+
+def test_fetch_dataset_list(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["fetch-dataset", "--list"]) == 0
+    assert "wright2019" in capsys.readouterr().out
+
+
+def test_fetch_dataset_requires_a_name(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["fetch-dataset"]) == 1
+    assert "error:" in capsys.readouterr().err

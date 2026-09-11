@@ -1,4 +1,4 @@
-"""Command line interface: `aer train`, `aer predict`, `aer evaluate`, `aer import-keras`."""
+"""Command line interface: train, predict, evaluate, import-keras and fetch-dataset."""
 
 import argparse
 import json
@@ -10,6 +10,12 @@ from pathlib import Path
 from audio_effect_replicator import __version__
 from audio_effect_replicator.audio import SAMPLE_RATE, load_wave, save_wave
 from audio_effect_replicator.config import load_config
+from audio_effect_replicator.datasets import (
+    fetch_dataset,
+    list_datasets,
+    load_manifest,
+    packaged_manifest,
+)
 from audio_effect_replicator.device import resolve_device
 from audio_effect_replicator.evaluate import evaluate_prediction, time_inference
 from audio_effect_replicator.legacy import load_keras_checkpoint
@@ -83,6 +89,15 @@ def _build_parser() -> argparse.ArgumentParser:
     p_import.add_argument("--output-timesteps", type=int, default=480)
     p_import.add_argument("--sample-rate", type=int, default=SAMPLE_RATE)
     p_import.set_defaults(func=_import_keras)
+
+    p_fetch = sub.add_parser("fetch-dataset", help="download a benchmark dataset into --dest")
+    p_fetch.add_argument("name", nargs="?", help="dataset name (see --list)")
+    p_fetch.add_argument("--dest", default=Path("data"), type=Path)
+    p_fetch.add_argument(
+        "--manifest", type=Path, help="use this manifest file instead of a packaged one"
+    )
+    p_fetch.add_argument("--list", action="store_true", help="list packaged datasets and exit")
+    p_fetch.set_defaults(func=_fetch_dataset)
     return parser
 
 
@@ -156,4 +171,18 @@ def _import_keras(args: argparse.Namespace) -> int:
         sample_rate=args.sample_rate,
     )
     print(f"wrote {args.output} (epoch {epoch}, {parameter_count(model)} parameters)")
+    return 0
+
+
+def _fetch_dataset(args: argparse.Namespace) -> int:
+    if args.list:
+        print("\n".join(list_datasets()))
+        return 0
+    if args.manifest is None and args.name is None:
+        raise ValueError("give a dataset name or --manifest (see --list)")
+    manifest = load_manifest(args.manifest or packaged_manifest(args.name))
+    root = fetch_dataset(manifest, args.dest)
+    print(f"{manifest.name}: {len(manifest.files)} files in {root}")
+    print(f"license: {manifest.license}")
+    print(f"citation: {manifest.citation}")
     return 0
