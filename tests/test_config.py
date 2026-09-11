@@ -130,3 +130,18 @@ def test_model_block_must_be_a_mapping(tmp_path: Path) -> None:
     )
     with pytest.raises(ConfigError, match="model"):
         load_config(path)
+
+
+def test_grad_clip_is_off_by_default(config_file: Path) -> None:
+    """The 2018 method did not clip gradients, so the default must not either."""
+    assert load_config(config_file).grad_clip == 0.0
+
+
+def test_grad_clip_is_read(tmp_path: Path) -> None:
+    path = tmp_path / "c.yml"
+    path.write_text(
+        "input_timesteps: 10\noutput_timesteps: 5\nbatch_size: 1\nmax_epochs: 1\npatience: 1\n"
+        "grad_clip: 1.0\n"
+        "train_data:\n  - [a.wav, b.wav]\nval_data:\n  - [a.wav, b.wav]\n"
+    )
+    assert load_config(path).grad_clip == 1.0

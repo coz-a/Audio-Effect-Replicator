@@ -1,6 +1,7 @@
 import math
 from pathlib import Path
 
+import pytest
 import torch
 
 from audio_effect_replicator.config import Config
@@ -28,3 +29,33 @@ def test_train_stops_within_max_epochs(tmp_path: Path, small_config: Config) -> 
     ckpt_dir = train(small_config, torch.device("cpu"), out_dir=tmp_path, seed=1)
     epochs = [int(p.stem.split("_")[1]) for p in ckpt_dir.glob("model_*.pt")]
     assert max(epochs) <= small_config.max_epochs
+
+
+def test_gradient_clipping_keeps_a_collapsing_run_alive(
+    tmp_path: Path, small_config: Config
+) -> None:
+    """A single huge gradient step can zero the model out; clipping must bound the update."""
+    from dataclasses import replace
+
+    import torch.nn as nn
+
+    from audio_effect_replicator.train import _clip_gradients
+
+    model = nn.Linear(1, 1)
+    model.weight.grad = torch.full_like(model.weight, 1000.0)
+    model.bias.grad = torch.full_like(model.bias, 1000.0)
+    _clip_gradients(model, replace(small_config, grad_clip=1.0))
+    squares = [p.grad.pow(2).sum() for p in model.parameters() if p.grad is not None]
+    total = torch.sqrt(torch.stack(squares).sum())
+    assert total.item() == pytest.approx(1.0, abs=1e-5)
+
+
+def test_gradients_are_untouched_when_clipping_is_off(small_config: Config) -> None:
+    import torch.nn as nn
+
+    from audio_effect_replicator.train import _clip_gradients
+
+    model = nn.Linear(1, 1)
+    model.weight.grad = torch.full_like(model.weight, 1000.0)
+    _clip_gradients(model, small_config)  # grad_clip defaults to 0
+    assert model.weight.grad.item() == 1000.0

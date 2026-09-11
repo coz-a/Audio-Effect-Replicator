@@ -35,6 +35,7 @@ class Config:
     validation_steps: int = 10
     sample_rate: int = 48000
     learning_rate: float = 1e-3
+    grad_clip: float = 0.0  # 0 disables clipping, as in the 2018 method
     model: ModelSpec = field(default_factory=ModelSpec)
     loss: LossSpec = field(default_factory=LossSpec)
 
@@ -49,7 +50,15 @@ _REQUIRED = (
     "val_data",
 )
 
-_OPTIONAL = ("steps_per_epoch", "validation_steps", "sample_rate", "learning_rate", "model", "loss")
+_OPTIONAL = (
+    "steps_per_epoch",
+    "validation_steps",
+    "sample_rate",
+    "learning_rate",
+    "grad_clip",
+    "model",
+    "loss",
+)
 
 
 def load_config(path: str | Path) -> Config:
@@ -75,6 +84,7 @@ def load_config(path: str | Path) -> Config:
         validation_steps=int(raw.get("validation_steps", 10)),
         sample_rate=int(raw.get("sample_rate", 48000)),
         learning_rate=float(raw.get("learning_rate", 1e-3)),
+        grad_clip=float(raw.get("grad_clip", 0.0)),
         model=_model_spec(raw.get("model")),
         loss=_loss_spec(raw.get("loss")),
     )

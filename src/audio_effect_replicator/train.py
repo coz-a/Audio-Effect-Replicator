@@ -68,6 +68,7 @@ def train(
             device,
             loss_fn,
             optimizer,
+            config,
         )
         model.eval()
         with torch.no_grad():
@@ -79,6 +80,7 @@ def train(
                 device,
                 loss_fn,
                 None,
+                config,
             )
         writer.add_scalar("loss/train", train_loss, epoch)
         writer.add_scalar("loss/val", val_loss, epoch)
@@ -117,6 +119,7 @@ def _run_steps(
     device: torch.device,
     loss_fn: Loss,
     optimizer: torch.optim.Optimizer | None,
+    config: Config,
 ) -> float:
     total = 0.0
     for _ in range(steps):
@@ -126,6 +129,13 @@ def _run_steps(
         if optimizer is not None:
             optimizer.zero_grad()
             loss.backward()
+            _clip_gradients(model, config)
             optimizer.step()
         total += loss.item()
     return total / steps
+
+
+def _clip_gradients(model: nn.Module, config: Config) -> None:
+    """Bound the update when `grad_clip` is set; a single huge step can zero an LSTM out."""
+    if config.grad_clip > 0:
+        torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
