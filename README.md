@@ -65,6 +65,24 @@ uv sync --extra cpu     # CPU only
 
 Add `--extra legacy` to install `h5py`, needed only for `aer import-keras`.
 
+## Datasets
+
+Any pair of mono WAV files (16/24/32-bit PCM or 32-bit float) can be used;
+set `sample_rate` in the config if it is not 48 kHz. Public benchmark data can
+be fetched with a checksum-verified download:
+
+```sh
+uv run aer fetch-dataset --list
+uv run aer fetch-dataset wright2019      # -> data/wright2019/
+```
+
+`wright2019` is the Blackstar HT-1 / Big Muff Pi data from Wright, Damskägg
+and Välimäki, "Real-Time Black-Box Modelling with Recurrent Neural Networks"
+(DAFx 2019), 44.1 kHz, with the train / val / test split of the original
+repository. It is licensed CC BY-NC 4.0: fine for research and comparisons,
+not for commercial models. `configs/wright2019-ht1.yml` and
+`configs/wright2019-muff.yml` train on it with the 2018 settings.
+
 ## Training
 
 Copy `configs/default.yml`, point `train_data` / `val_data` at your WAV pairs,
@@ -107,6 +125,23 @@ Reported values (add `--json scores.json` to save them):
   (2048 / 512, both signals rounded to 16-bit PCM first) in dB
 - `parameters`, `inference_seconds`, `realtime_factor` (audio seconds per
   wall-clock second) when a model is given
+
+## Benchmarks
+
+Test-set scores of the 2018 method (this code, `configs/wright2019-*.yml`:
+the 2018 settings at 44.1 kHz) on the `wright2019` data. One run each,
+seed 0, RTX 4090; no pre-trained weights are shipped.
+
+| Device | Model | Parameters | ESR | MSE | LSD (dB) |
+| --- | --- | --- | --- | --- | --- |
+| Blackstar HT-1 | LSTM 64-64-1, MSE loss, sliding window (2018 method) | 50,700 | 2.97 % | 0.00297 | 13.97 |
+| Big Muff Pi | LSTM 64-64-1, MSE loss, sliding window (2018 method) | 50,700 | 11.1 % | 0.00028 | 8.65 |
+
+For reference, Wright et al. (2019) report test ESR of 1.8 % (HT-1) and
+4.1 % (Big Muff) for their single-layer LSTM-64 with a linear output trained
+with an ESR + pre-emphasis loss, and 0.79 % / 9.2 % for their best WaveNet
+models. Their models were trained on five control settings with a
+conditioning input, so the comparison is indicative only.
 
 ## Development
 
