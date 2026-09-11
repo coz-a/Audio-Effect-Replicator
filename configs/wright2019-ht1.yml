@@ -1,0 +1,11 @@
+---
+sample_rate: 44100
+input_timesteps: 5280
+output_timesteps: 480
+batch_size: 16
+max_epochs: 10000
+patience: 50
+train_data:
+  - [data/wright2019/train/ht1-input.wav, data/wright2019/train/ht1-target.wav]
+val_data:
+  - [data/wright2019/val/ht1-input.wav, data/wright2019/val/ht1-target.wav]
