@@ -1,0 +1,11 @@
+name: tonetwist-afx
+description: 'ToneTwisT AFx dataset, hardware effects sampled at several knob settings: dry/wet pairs at 48 kHz / 32-bit float with trainval and test splits. Each archive is extracted into a folder of its own name; the DRY input archive is shared by the subsets.'
+license: CC-BY-NC-4.0
+citation: 'M. Comunità, C. J. Steinmetz and J. D. Reiss, "Differentiable black-box and gray-box modeling of nonlinear audio effects", Frontiers in Signal Processing, 2025. Dataset: https://github.com/mcomunita/tonetwist-afx-dataset (each subset is a Zenodo record).'
+sample_rate: 48000
+files:
+- path: Marshall-JVM410H-ChOD1.zip
+  md5: 05ee998404f44c3a449c4ad6a8160cb6
+  size: 2755382616
+  extract: true
+  url: https://zenodo.org/records/10892012/files/Marshall-JVM410H-ChOD1.zip?download=1

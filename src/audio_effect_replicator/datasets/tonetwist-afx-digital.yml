@@ -1,0 +1,31 @@
+name: tonetwist-afx
+description: 'ToneTwisT AFx dataset, digital (plugin) effects, one knob setting each: dry/wet pairs at 48 kHz / 32-bit float with trainval and test splits. Each archive is extracted into a folder of its own name; the DRY input archive is shared by the subsets.'
+license: CC-BY-NC-4.0
+citation: 'M. Comunità, C. J. Steinmetz and J. D. Reiss, "Differentiable black-box and gray-box modeling of nonlinear audio effects", Frontiers in Signal Processing, 2025. Dataset: https://github.com/mcomunita/tonetwist-afx-dataset (each subset is a Zenodo record).'
+sample_rate: 48000
+files:
+- path: Amplitube-DComp.zip
+  md5: 59b6687448235ee16523832267010484
+  size: 452814388
+  extract: true
+  url: https://zenodo.org/records/10901328/files/Amplitube-DComp.zip?download=1
+- path: Amplitube-FenderComp.zip
+  md5: 1b1b6c01fdbf28abac97199901b6caab
+  size: 455284330
+  extract: true
+  url: https://zenodo.org/records/10901340/files/Amplitube-FenderComp.zip?download=1
+- path: Arturia-RevSpring636Preamp.zip
+  md5: 21ed87d81a485cd2d9546b6e5df0564f
+  size: 444448846
+  extract: true
+  url: https://zenodo.org/records/10901350/files/Arturia-RevSpring636Preamp.zip?download=1
+- path: Custom-DynamicFuzz.zip
+  md5: 476ac35a87256878e221155577fb6b11
+  size: 423798892
+  extract: true
+  url: https://zenodo.org/records/10901357/files/Custom-DynamicFuzz.zip?download=1
+- path: DRY.zip
+  md5: e3831d0310d84b0580e149bbd2db1ed1
+  size: 417619427
+  extract: true
+  url: https://zenodo.org/records/10901426/files/DRY.zip?download=1
