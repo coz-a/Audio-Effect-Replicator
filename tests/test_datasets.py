@@ -260,3 +260,18 @@ def test_download_keeps_a_partial_file_axel_can_resume(
     target.with_name("resumable.zip.st").write_bytes(b"axel state")
     datasets._download("https://example.invalid/resumable.zip", target)
     assert target.read_bytes() == b"partial"
+
+
+def test_fetch_does_not_stamp_an_archive_whose_extraction_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stamp written before extraction would mark a half-unpacked dataset as done."""
+
+    def boom(archive: Path) -> None:
+        raise RuntimeError("interrupted")
+
+    monkeypatch.setattr(datasets, "_extract", boom)
+    m = load_manifest(zip_manifest(tmp_path))
+    with pytest.raises(RuntimeError):
+        fetch_dataset(m, tmp_path / "data")
+    assert not (tmp_path / "data" / "zipped" / "Effect.zip.md5").exists()

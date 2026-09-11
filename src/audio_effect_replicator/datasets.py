@@ -103,10 +103,10 @@ def fetch_dataset(manifest: Manifest, dest: Path) -> Path:
                 target.unlink()
                 raise RuntimeError(f"{entry.path}: checksum mismatch after download")
         if entry.extract:
-            _stamp(target).write_text(entry.md5 + "\n")
             if target.suffix == ".zip":
                 log.info("%s: extracting", entry.path)
                 _extract(target)
+            _stamp(target).write_text(entry.md5 + "\n")  # only once the data is in place
     return root
 
 
