@@ -52,5 +52,5 @@ def test_parameter_count_of_2018_model() -> None:
 
 def test_lsd_is_insensitive_to_16_bit_quantization() -> None:
     x = signal()
-    quantized = (np.round(x * 32767) / 32767).astype(np.float32)
+    quantized = (np.round(x * 32768) / 32768).astype(np.float32)
     assert log_spectral_distance(x, quantized) == 0.0
