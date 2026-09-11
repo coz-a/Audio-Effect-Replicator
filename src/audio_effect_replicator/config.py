@@ -21,6 +21,7 @@ class Config:
     val_data: list[tuple[Path, Path]]
     steps_per_epoch: int = 100
     validation_steps: int = 10
+    sample_rate: int = 48000
 
 
 _REQUIRED = (
@@ -52,6 +53,7 @@ def load_config(path: str | Path) -> Config:
         val_data=_pairs(raw["val_data"], "val_data"),
         steps_per_epoch=int(raw.get("steps_per_epoch", 100)),
         validation_steps=int(raw.get("validation_steps", 10)),
+        sample_rate=int(raw.get("sample_rate", 48000)),
     )
     if config.output_timesteps > config.input_timesteps:
         raise ConfigError("output_timesteps must not exceed input_timesteps")

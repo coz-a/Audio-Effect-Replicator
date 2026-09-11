@@ -47,3 +47,12 @@ def test_too_short_audio_is_rejected() -> None:
     x = np.zeros(5, np.float32)
     with pytest.raises(ValueError, match="shorter"):
         WindowSampler([(x, x)], timesteps=8, batch_size=1, rng=np.random.default_rng(0))
+
+
+def test_load_pairs_uses_the_given_sample_rate(tmp_path: Path) -> None:
+    save_wave(np.zeros(10, np.float32), tmp_path / "x.wav", sample_rate=44100)
+    save_wave(np.zeros(10, np.float32), tmp_path / "y.wav", sample_rate=44100)
+    pair = (tmp_path / "x.wav", tmp_path / "y.wav")
+    assert load_pairs([pair], sample_rate=44100)[0][0].shape == (10,)
+    with pytest.raises(ValueError):
+        load_pairs([pair])

@@ -20,3 +20,10 @@ def test_time_inference_reports_seconds_and_realtime_factor() -> None:
     assert set(result) == {"inference_seconds", "realtime_factor"}
     assert result["inference_seconds"] > 0
     assert result["realtime_factor"] == 0.5 / result["inference_seconds"]
+
+
+def test_time_inference_uses_the_given_sample_rate() -> None:
+    model = FxReplicator(hidden=4)
+    samples = np.zeros(44100, np.float32)  # 1 s at 44.1 kHz
+    result = time_inference(model, samples, 64, 16, 32, torch.device("cpu"), sample_rate=44100)
+    assert result["realtime_factor"] == 1.0 / result["inference_seconds"]

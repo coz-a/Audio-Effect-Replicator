@@ -29,10 +29,16 @@ def train(
         torch.manual_seed(seed)
 
     train_sampler = WindowSampler(
-        load_pairs(config.train_data), config.input_timesteps, config.batch_size, rng
+        load_pairs(config.train_data, config.sample_rate),
+        config.input_timesteps,
+        config.batch_size,
+        rng,
     )
     val_sampler = WindowSampler(
-        load_pairs(config.val_data), config.input_timesteps, config.batch_size, rng
+        load_pairs(config.val_data, config.sample_rate),
+        config.input_timesteps,
+        config.batch_size,
+        rng,
     )
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -68,6 +74,7 @@ def train(
                 config.output_timesteps,
                 epoch,
                 val_loss,
+                sample_rate=config.sample_rate,
             )
         else:
             epochs_without_improvement += 1
