@@ -88,13 +88,18 @@ def fetch_dataset(manifest: Manifest, dest: Path) -> Path:
             log.info("%s: already present", entry.path)
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        log.info(
-            "%s: downloading%s", entry.path, f" ({entry.size / 1e9:.1f} GB)" if entry.size else ""
-        )
-        urllib.request.urlretrieve(entry.url, target)
-        if _md5(target) != entry.md5:
-            target.unlink()
-            raise RuntimeError(f"{entry.path}: checksum mismatch after download")
+        if target.exists() and _md5(target) == entry.md5:
+            log.info("%s: already downloaded", entry.path)
+        else:
+            log.info(
+                "%s: downloading%s",
+                entry.path,
+                f" ({entry.size / 1e9:.1f} GB)" if entry.size else "",
+            )
+            urllib.request.urlretrieve(entry.url, target)
+            if _md5(target) != entry.md5:
+                target.unlink()
+                raise RuntimeError(f"{entry.path}: checksum mismatch after download")
         if entry.extract:
             _stamp(target).write_text(entry.md5 + "\n")
             if target.suffix == ".zip":

@@ -188,3 +188,14 @@ def test_fetch_merges_split_archives(tmp_path: Path) -> None:
     assert (root / "Split" / "Split" / "big.bin").read_bytes() == payload.read_bytes()
     leftovers = [p for p in root.glob("Split.z*") if p.suffix != ".md5"]
     assert not leftovers, "parts and archive are removed after extraction"
+
+
+def test_fetch_reuses_a_verified_archive_without_downloading(tmp_path: Path) -> None:
+    m = load_manifest(zip_manifest(tmp_path))
+    root = tmp_path / "data" / "zipped"
+    root.mkdir(parents=True)
+    shutil.copy(tmp_path / "src" / "Effect.zip", root / "Effect.zip")
+    (tmp_path / "src" / "Effect.zip").unlink()  # the "download" would now fail
+    fetch_dataset(m, tmp_path / "data")
+    assert (root / "Effect" / "Effect" / "test" / "x.wav").exists()
+    assert (root / "Effect.zip.md5").read_text().strip() == m.files[0].md5
